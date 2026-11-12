@@ -1,0 +1,183 @@
+# Fork-only CI for mokbhai/OmniRoute (never runs upstream).
+#
+# Triggers:
+#   push production   what omni.jainparichay.in runs. Tests, then image.
+#   push sync/**      a new upstream release merged into production. Tests, then image.
+#   manual baseline   workflow_dispatch with repository=cheaper-inference/OmniRoute and
+#                     ref=<release tag>: tests the pure upstream release, no image. It tells
+#                     failures upstream already ships apart from ones our changes cause.
+#
+# The image is tagged <package.json version>-<short sha> (for example 3.8.54-1a2b3c4) and
+# pushed to ghcr.io/<owner>/omniroute. Deploying it is a separate, approved step.
+name: Fork CI
+
+on:
+  push:
+    branches:
+      - production
+      - "sync/**"
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: "Repository to test (empty = this fork)"
+        required: false
+        default: ""
+      ref:
+        description: "Tag, branch or SHA to test (empty = the dispatched branch)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "24"
+  IMAGE: ghcr.io/${{ github.repository_owner }}/omniroute
+
+jobs:
+  checks:
+    if: github.repository != 'cheaper-inference/OmniRoute'
+    name: Typecheck, lint, vitest
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      JWT_SECRET: ci-test-secret-with-sufficient-length-for-validation
+      API_KEY_SECRET: ci-test-api-key-secret-long
+      DISABLE_SQLITE_AUTO_BACKUP: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository || github.repository }}
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck:core
+      - run: npm run lint
+      - run: npm run test:vitest
+
+  unit:
+    if: github.repository != 'cheaper-inference/OmniRoute'
+    name: Unit tests (${{ matrix.shard }}/8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    env:
+      JWT_SECRET: ci-test-secret-with-sufficient-length-for-validation
+      API_KEY_SECRET: ci-test-api-key-secret-long
+      DISABLE_SQLITE_AUTO_BACKUP: "true"
+      TEST_SHARD: ${{ matrix.shard }}/8
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository || github.repository }}
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:unit:ci:shard
+
+  serial:
+    if: github.repository != 'cheaper-inference/OmniRoute'
+    name: Unit tests (serial)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      JWT_SECRET: ci-test-secret-with-sufficient-length-for-validation
+      API_KEY_SECRET: ci-test-api-key-secret-long
+      DISABLE_SQLITE_AUTO_BACKUP: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository || github.repository }}
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:unit:serial
+
+  image:
+    needs: [checks, unit, serial]
+    # A baseline run (another repository or ref) only tests.
+    if: github.event_name != 'workflow_dispatch' || (inputs.repository == '' && inputs.ref == '')
+    name: Image (${{ matrix.arch }})
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Resolve tag
+        run: |
+          echo "IMAGE=${IMAGE,,}" >> "$GITHUB_ENV"
+          echo "TAG=$(node -p 'require("./package.json").version')-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Same Dockerfile target and build args as upstream docker-publish.yml's default image.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runner-base
+          platforms: linux/${{ matrix.arch }}
+          build-args: |
+            OMNIROUTE_USE_TURBOPACK=0
+            OMNIROUTE_BUILD_MEMORY_MB=12288
+          push: true
+          provenance: false
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}-${{ matrix.arch }}
+          cache-from: type=gha,scope=fork-${{ matrix.arch }}
+          cache-to: type=gha,scope=fork-${{ matrix.arch }},mode=max,ignore-error=true
+
+  manifest:
+    needs: image
+    name: Publish multi-arch tag
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish
+        run: |
+          IMAGE="${IMAGE,,}"
+          TAG="$(node -p 'require("./package.json").version')-${GITHUB_SHA::7}"
+          docker buildx imagetools create -t "$IMAGE:$TAG" "$IMAGE:$TAG-amd64" "$IMAGE:$TAG-arm64"
+          docker buildx imagetools inspect "$IMAGE:$TAG"
+          echo "### Image ready: \`$IMAGE:$TAG\`" >> "$GITHUB_STEP_SUMMARY"
