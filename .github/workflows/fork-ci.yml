@@ -30,8 +30,10 @@ on:
 permissions:
   contents: read
 
+# A baseline run (dispatch with repository/ref) gets its own group, so it never cancels
+# the production or sync run on the same branch.
 concurrency:
-  group: fork-ci-${{ github.ref }}
+  group: fork-ci-${{ github.ref }}-${{ inputs.repository }}-${{ inputs.ref }}
   cancel-in-progress: true
 
 env:
