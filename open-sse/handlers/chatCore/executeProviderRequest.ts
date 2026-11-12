@@ -146,8 +146,6 @@ export type ExecuteProviderRequestDeps = {
   settings: Record<string, unknown> | null | undefined;
   toolDisclosure?: ToolDisclosureConfig | null;
   skipUpstreamRetry: boolean;
-  /** Antigravity: another account can take this request (see ExecuteInput). */
-  accountFailoverAvailable?: boolean;
   stream: boolean;
   streamController: { signal: AbortSignal };
   targetFormat: string;
@@ -195,7 +193,6 @@ export async function executeProviderRequest(
     resilienceSettings,
     settings,
     skipUpstreamRetry,
-    accountFailoverAvailable = false,
     stream,
     streamController,
     targetFormat,
@@ -365,7 +362,6 @@ export async function executeProviderRequest(
                         clientResponseFormat,
                         onCredentialsRefreshed,
                         skipUpstreamRetry,
-                        accountFailoverAvailable,
                         contextEditing: { enabled: contextEditingEnabled },
                         correlationId,
                       });
@@ -574,7 +570,6 @@ export async function executeProviderRequest(
                             clientResponseFormat,
                             onCredentialsRefreshed,
                             skipUpstreamRetry,
-                            accountFailoverAvailable,
                             contextEditing: { enabled: contextEditingEnabled },
                             correlationId,
                           });
