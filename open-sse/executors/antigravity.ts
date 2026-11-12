@@ -584,6 +584,8 @@ type AntigravityAttemptContext = {
   correlationId: string | null;
   /** Per-request upstream-429 budget across ALL hosts (antigravity429Guard.ts). */
   rateLimitBudget: AntigravityRateLimitBudget;
+  /** Another Antigravity account can take this request: hand a 503 back at once. */
+  accountFailoverAvailable: boolean;
 };
 
 /**
@@ -1394,6 +1396,7 @@ export class AntigravityExecutor extends BaseExecutor {
       log,
       upstreamExtraHeaders,
       correlationId = null,
+      accountFailoverAvailable = false,
     }: ExecuteInput,
     modelIdOverride?: string,
     physicalSendCounter: AntigravityPhysicalSendCounter = { value: 0 }
@@ -1492,6 +1495,7 @@ export class AntigravityExecutor extends BaseExecutor {
           physicalSendCounter,
           correlationId,
           rateLimitBudget,
+          accountFailoverAvailable,
         });
 
         if (outcome.action === "return") return outcome.result;
@@ -1580,8 +1584,18 @@ export class AntigravityExecutor extends BaseExecutor {
 
     let retryMs: number | null = null;
     let budget429Spent = false;
+    // Google answers 503 when it has no capacity for the model on this account. Another
+    // account usually still has capacity, so when one is available the caller switches to it
+    // instead of this account waiting out Google's retry delay (up to 60s, 3 times).
+    const failOverToAnotherAccount =
+      ctx.accountFailoverAvailable && response.status === HTTP_STATUS.SERVICE_UNAVAILABLE;
 
-    if (
+    if (failOverToAnotherAccount) {
+      log.warn(
+        "AG_503_FAILOVER",
+        "503 from Antigravity — returning it so the request moves to another account"
+      );
+    } else if (
       response.status === HTTP_STATUS.RATE_LIMITED ||
       response.status === HTTP_STATUS.SERVICE_UNAVAILABLE
     ) {
@@ -1608,7 +1622,11 @@ export class AntigravityExecutor extends BaseExecutor {
       retryMs = rateLimitOutcome.retryMs;
     }
 
-    if (!budget429Spent && this.shouldRetry(response.status, urlIndex, model)) {
+    if (
+      !budget429Spent &&
+      !failOverToAnotherAccount &&
+      this.shouldRetry(response.status, urlIndex, model)
+    ) {
       log.debug("RETRY", `${response.status} on ${url}, trying fallback ${urlIndex + 1}`);
       return { action: "retry", sameUrl: false, lastStatus: response.status };
     }
