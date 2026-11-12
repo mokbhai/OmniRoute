@@ -15,7 +15,7 @@ permissions:
 
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/omniroute
-  TAG: 3.8.53-agfix
+  TAG: 3.8.53-agfix2
 
 jobs:
   build:
