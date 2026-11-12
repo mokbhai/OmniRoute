@@ -123,7 +123,24 @@ export function isModelCapacityOverloadError(error: unknown): boolean {
   const message =
     typeof error === "string" ? error : typeof errObj?.message === "string" ? errObj.message : "";
   if (!message) return false;
-  return /\boverloaded(?:_error)?\b/i.test(message);
+  return /\boverloaded(?:_error)?\b/i.test(message) || isModelCapacityExhaustedError(message);
+}
+
+/**
+ * Google Cloud Code (Antigravity) has no capacity for one model on this account right now:
+ * HTTP 503 `No capacity available for model <id> on the server`, ErrorInfo reason
+ * `MODEL_CAPACITY_EXHAUSTED`. Another account usually still has capacity (2026-11-12: one
+ * account got 12 of these while the other served the same model without one), so it is a
+ * model-and-account condition, not a provider outage.
+ */
+export function isModelCapacityExhaustedError(error: unknown): boolean {
+  const message =
+    typeof error === "string"
+      ? error
+      : typeof (error as { message?: unknown } | null)?.message === "string"
+        ? ((error as { message: string }).message as string)
+        : "";
+  return /no capacity available for model|model_capacity_exhausted/i.test(message);
 }
 
 export const STATE = {

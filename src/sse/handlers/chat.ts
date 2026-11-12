@@ -168,7 +168,11 @@ import { resolveUseUpstream429BreakerHints } from "@/shared/utils/providerHints"
 import { isFeatureFlagEnabled, isRotationAttributionEnabled } from "@/shared/utils/featureFlags";
 import * as agyLease from "../services/antigravityLeaseLifecycle";
 import { shouldIsolateProbeFailures } from "@/shared/utils/probeOrigin";
-import { getCircuitBreaker, isLocalStreamLifecycleError } from "../../shared/utils/circuitBreaker";
+import {
+  getCircuitBreaker,
+  isLocalStreamLifecycleError,
+  isModelCapacityExhaustedError,
+} from "../../shared/utils/circuitBreaker";
 import { maybeMarkChatAccountExhaustedFrom429 } from "../services/chatQuotaExhaustion";
 import { markQuotaHealthy } from "../../domain/quotaCache";
 import { resolveForcedConnectionForCredentialPool } from "../services/sessionAffinityPin.ts";
@@ -1944,6 +1948,10 @@ async function handleSingleModelChat(
           isProviderBreakerFailureStatus(breakerFailureStatus) &&
           !isNetworkError &&
           !isQueueTimeout &&
+          // Antigravity "No capacity available for model": one model on one account is out
+          // of capacity, not an outage (shouldTripProviderBreakerForResult skips it too).
+          // Narrow on purpose: a generic "overloaded" 503 still counts here (#12254).
+          !isModelCapacityExhaustedError(lastError) &&
           // Probe-origin dispatches must not degrade the provider breaker —
           // routing state untouched (#9817).
           !(await shouldIsolateProbeFailures())

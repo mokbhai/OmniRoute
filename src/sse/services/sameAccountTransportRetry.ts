@@ -16,6 +16,7 @@
 
 import { UPSTREAM_RESPONDED_ERROR_TYPE } from "@omniroute/open-sse/utils/diagnostics.ts";
 import { LOCAL_CONFIGURATION_ERROR_CODES } from "@omniroute/open-sse/config/constants.ts";
+import { isModelCapacityExhaustedError } from "../../shared/utils/circuitBreaker";
 
 export const SAME_ACCOUNT_TRANSPORT_RETRY_MAX = 1;
 export const SAME_ACCOUNT_TRANSPORT_RETRY_MIN_DELAY_MS = 2000;
@@ -106,6 +107,14 @@ export function shouldRetrySameAccountTransport(options: {
     options.errorCode === "ANTIGRAVITY_PRE_RESPONSE_TIMEOUT" ||
     ((options.provider === "antigravity" || options.provider === "agy") &&
       (options.errorType === "upstream_timeout" || Number(options.status) === 504))
+  )
+    return false;
+  // Antigravity 503 "No capacity available for model": that account has no capacity for the
+  // model right now, and the executor already declined to retry it. Another account usually
+  // has capacity, so select one instead of sending the same request back to this account.
+  if (
+    (options.provider === "antigravity" || options.provider === "agy") &&
+    isModelCapacityExhaustedError(options.errorText)
   )
     return false;
   if (options.attempt >= SAME_ACCOUNT_TRANSPORT_RETRY_MAX) return false;

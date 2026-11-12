@@ -1709,14 +1709,16 @@ export class AntigravityExecutor extends BaseExecutor {
     // What Google itself stated, before decide429 fills in its defaults.
     let upstreamRetryHintMs: number | null = retryMs;
 
-    // If no retry time in headers, try to parse from error message body
+    // If no retry time in headers, try to parse from error message body. A 503 is always
+    // classified: whether to switch auth (no model capacity on this account) depends on the
+    // body, not on how Google stated the delay. A header delay still wins for timing.
     let switchAuth = false;
-    if (!retryMs) {
+    if (!retryMs || response.status === HTTP_STATUS.SERVICE_UNAVAILABLE) {
       const resolved = await this.tryResolveRetryFromErrorBody(ctx);
       if (resolved.kind === "return") return { action: "return", result: resolved.result };
-      retryMs = resolved.retryMs;
+      retryMs = retryMs || resolved.retryMs;
       switchAuth = resolved.switchAuth;
-      upstreamRetryHintMs = resolved.upstreamRetryHintMs;
+      upstreamRetryHintMs = upstreamRetryHintMs || resolved.upstreamRetryHintMs;
     }
 
     if (budget429Spent) {
@@ -1758,7 +1760,12 @@ export class AntigravityExecutor extends BaseExecutor {
     // Auto retry for 429 (no Retry-After) or transient 5xx errors.
     // For 5xx we read the body to detect known transient patterns
     // ("Agent execution terminated due to error", "high traffic", "capacity").
-    if ((!retryMs || retryMs === 0) && retryAttemptsByUrl[urlIndex] < MAX_AUTO_RETRIES) {
+    // Never when the engine decided to switch auth: retrying this account is what it rules out.
+    if (
+      !switchAuth &&
+      (!retryMs || retryMs === 0) &&
+      retryAttemptsByUrl[urlIndex] < MAX_AUTO_RETRIES
+    ) {
       const shouldAutoRetry = await this.shouldAutoRetryTransient(response);
       if (shouldAutoRetry) {
         retryAttemptsByUrl[urlIndex]++;

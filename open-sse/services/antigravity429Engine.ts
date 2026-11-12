@@ -10,6 +10,9 @@
  *   - rate_limited:     Per-minute rate limit, short backoff + same auth retry
  *   - quota_exhausted:  Daily/plan quota gone, switch auth or long cooldown
  *   - soft_rate_limit:  Temporary burst limit, instant retry
+ *   - model_capacity:   503 "No capacity available for model" (MODEL_CAPACITY_EXHAUSTED):
+ *                       Google has no capacity for this model on this account. Another
+ *                       account usually has it, so switch auth instead of waiting here.
  *
  * Decisions:
  *   - soft_retry:                    Wait briefly, retry same auth
@@ -17,8 +20,10 @@
  *   - short_cooldown_switch_auth:    5min cooldown, try next account
  *   - full_quota_exhausted:          24h cooldown, skip this account
  */
+import { isModelCapacityExhaustedError } from "../../src/shared/utils/circuitBreaker.ts";
 
-export type Category = "unknown" | "rate_limited" | "quota_exhausted" | "soft_rate_limit";
+export type Category =
+  "unknown" | "rate_limited" | "quota_exhausted" | "soft_rate_limit" | "model_capacity";
 
 export type DecisionKind =
   "soft_retry" | "instant_retry_same_auth" | "short_cooldown_switch_auth" | "full_quota_exhausted";
@@ -74,6 +79,9 @@ export function classify429(errorMessage: string): Category {
     if (lower.includes(kw)) return "quota_exhausted";
   }
 
+  // No capacity for this model on this account (a 503, which also passes through here).
+  if (isModelCapacityExhaustedError(lower)) return "model_capacity";
+
   // Check for credits exhaustion (also quota-related)
   for (const kw of CREDITS_EXHAUSTED_KEYWORDS) {
     if (lower.includes(kw)) return "quota_exhausted";
@@ -127,6 +135,15 @@ export function decide429(category: Category, retryAfterMs: number | null): Deci
             : "short_cooldown_switch_auth",
         retryAfterMs: retryAfterMs ?? 60_000,
         reason: "RPM rate limit — switch auth if cooldown is long",
+      };
+
+    case "model_capacity":
+      // Waiting here only delays the request: the caller moves it to another account,
+      // and with no other account its cooldown-aware retry waits and retries.
+      return {
+        kind: "short_cooldown_switch_auth",
+        retryAfterMs,
+        reason: "No model capacity on this account — switch auth",
       };
 
     case "quota_exhausted":
