@@ -59,7 +59,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - run: npm ci --no-audit --no-fund
+      # Upstream's own install step: pins npm to config/ci/toolchain.json (tests assert it)
+      # and caches node_modules. A plain `npm ci` used the runner's newer npm and failed
+      # the 21 onnx-install-env tests that pin it.
+      - uses: ./.github/actions/npm-ci-retry
       - run: npm run typecheck:core
       - run: npm run lint
       - run: npm run test:vitest
@@ -88,7 +91,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - run: npm ci --no-audit --no-fund
+      # Upstream's own install step: pins npm to config/ci/toolchain.json (tests assert it)
+      # and caches node_modules. A plain `npm ci` used the runner's newer npm and failed
+      # the 21 onnx-install-env tests that pin it.
+      - uses: ./.github/actions/npm-ci-retry
       - run: npm run test:unit:ci:shard
 
   serial:
@@ -109,7 +115,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - run: npm ci --no-audit --no-fund
+      # Upstream's own install step: pins npm to config/ci/toolchain.json (tests assert it)
+      # and caches node_modules. A plain `npm ci` used the runner's newer npm and failed
+      # the 21 onnx-install-env tests that pin it.
+      - uses: ./.github/actions/npm-ci-retry
       - run: npm run test:unit:serial
 
   image:
