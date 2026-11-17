@@ -460,6 +460,42 @@ function cacheTurnCompletion(key: string, value: TurnCompletionState): TurnCompl
   return value;
 }
 
+/**
+ * End state of a non-Responses-API reply, from the end reason its own format records.
+ * `null` means "not one of these formats" (the Responses-API checks below decide);
+ * a recognized format with no end reason (a stream cut before the final chunk) is
+ * "incomplete", and a shape no rule recognizes falls through to "unknown" further down.
+ */
+function resolveNonResponsesCompletion(
+  body: Record<string, unknown> | undefined
+): TurnCompletionState | null {
+  if (!body) return null;
+  if (Array.isArray(body.choices)) {
+    const reasons = body.choices
+      .map((c) => (isPlainRecord(c) ? c.finish_reason : undefined))
+      .filter((r): r is string => typeof r === "string" && r.length > 0);
+    if (reasons.includes("tool_calls") || reasons.includes("function_call")) {
+      return "tool_call_pending";
+    }
+    if (reasons.length > 0 && reasons.every((r) => r === "stop")) return "stop";
+    return "incomplete";
+  }
+  if (body.type === "message" && "stop_reason" in body) {
+    const reason = body.stop_reason;
+    if (reason === "tool_use") return "tool_call_pending";
+    if (reason === "end_turn" || reason === "stop_sequence") return "stop";
+    return "incomplete";
+  }
+  if (Array.isArray(body.candidates)) {
+    const first = isPlainRecord(body.candidates[0]) ? body.candidates[0] : null;
+    const content = first && isPlainRecord(first.content) ? first.content : null;
+    const parts = content && Array.isArray(content.parts) ? content.parts : [];
+    if (parts.some((part) => isPlainRecord(part) && part.functionCall)) return "tool_call_pending";
+    return first?.finishReason === "STOP" ? "stop" : "incomplete";
+  }
+  return null;
+}
+
 export function resolveTurnCompletionState(
   artifactRelPath: string | null | undefined
 ): TurnCompletionState {
@@ -479,6 +515,15 @@ export function resolveTurnCompletionState(
     return cacheTurnCompletion(artifactRelPath, "incomplete");
   }
 
+  // Chat Completions / Anthropic Messages / Gemini replies carry their own end reason
+  // and no Responses-API status/output. Without this, every finished /v1/chat/completions
+  // turn read as "incomplete" and the conversation showed "stalled" 5 minutes later.
+  const body = (
+    isPlainRecord(clientResponse?.summary) ? clientResponse.summary : clientResponse
+  ) as Record<string, unknown> | undefined;
+  const otherFormat = resolveNonResponsesCompletion(body);
+  if (otherFormat !== null) return cacheTurnCompletion(artifactRelPath, otherFormat);
+
   // Same dual-shape concern as resolvePreviousResponseState above: a
   // streaming reply nests status/output under `.summary`, a non-streaming
   // one carries them at the top level.
@@ -493,7 +538,15 @@ export function resolveTurnCompletionState(
     : Array.isArray(clientResponse?.output)
       ? clientResponse.output
       : undefined;
-  if (!Array.isArray(output) || output.length === 0) {
+  if (!Array.isArray(output)) {
+    // A Responses-API reply always has `output`; a shape with neither it nor a status
+    // isn't one this function knows, so it must not be reported as a stall.
+    return cacheTurnCompletion(
+      artifactRelPath,
+      typeof status === "string" ? "incomplete" : "unknown"
+    );
+  }
+  if (output.length === 0) {
     return cacheTurnCompletion(artifactRelPath, "incomplete");
   }
 
