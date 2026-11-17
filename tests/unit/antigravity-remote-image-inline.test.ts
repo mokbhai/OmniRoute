@@ -169,3 +169,65 @@ describe("Antigravity remote image URLs", () => {
     );
   });
 });
+
+// Production failure (2026-11-17): a 4-image request whose last image was a 19.3 MB PNG
+// failed with "Could not download the image URL for Antigravity" because the per-image
+// download cap was 15 MB, and the remaining three ~5 MB JPEGs would still have pushed the
+// request past Antigravity's ~20 MB inline budget. Oversized images must be downscaled.
+describe("Antigravity oversized remote images", () => {
+  async function noisePng(width: number, height: number): Promise<Buffer> {
+    const { default: sharp } = await import("sharp");
+    const raw = Buffer.alloc(width * height * 3);
+    for (let i = 0; i < raw.length; i++) raw[i] = (i * 2654435761) >>> 24;
+    return sharp(raw, { raw: { width, height, channels: 3 } })
+      .png({ compressionLevel: 0 })
+      .toBuffer();
+  }
+
+  it("downloads a >15 MB image and shrinks every image to fit the inline budget", async () => {
+    const big = await noisePng(3600, 1900); // ~20 MB uncompressed PNG
+    assert.ok(big.byteLength > 15 * 1024 * 1024, `fixture is ${big.byteLength} bytes`);
+    const urls = [1, 2, 3, 4].map((n) => `https://93.184.216.34/img-${n}.png`);
+    const contents = [
+      {
+        role: "user",
+        parts: urls.map((fileUri) => ({ fileData: { fileUri, mimeType: "image/*" } })),
+      },
+    ];
+    const out = await inlineAntigravityRemoteImages(contents, {
+      fetchImage: async (uri) => ({ buffer: big, contentType: "image/png", url: String(uri) }),
+    });
+    const inline = out[0].parts.map(
+      (p) => (p as { inlineData: { mimeType: string; data: string } }).inlineData
+    );
+    assert.equal(inline.length, 4);
+    const totalBase64 = inline.reduce((sum, i) => sum + i.data.length, 0);
+    assert.ok(totalBase64 < 18 * 1024 * 1024, `inline payload is ${totalBase64} base64 chars`);
+    for (const i of inline) assert.equal(i.mimeType, "image/jpeg");
+  });
+
+  it("keeps small images byte-for-byte", async () => {
+    const out = await inlineAntigravityRemoteImages(
+      [{ role: "user", parts: [{ fileData: { fileUri: IMAGE_URL, mimeType: "image/*" } }] }],
+      { fetchImage: async (uri) => ({ buffer: PNG, contentType: "image/png", url: String(uri) }) }
+    );
+    assert.deepEqual(out[0].parts[0], {
+      inlineData: { mimeType: "image/png", data: PNG.toString("base64") },
+    });
+  });
+
+  it("says the image is too large instead of 'could not download' when over the cap", async () => {
+    await assert.rejects(
+      inlineAntigravityRemoteImages(
+        [{ role: "user", parts: [{ fileData: { fileUri: IMAGE_URL, mimeType: "image/*" } }] }],
+        {
+          fetchImage: async () => {
+            throw new Error("Remote image exceeds 52428800 byte limit");
+          },
+        }
+      ),
+      (error: Error) =>
+        error instanceof AntigravityRemoteImageError && /too large/i.test(error.message)
+    );
+  });
+});
