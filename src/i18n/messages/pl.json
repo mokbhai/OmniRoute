@@ -13800,8 +13800,6 @@
     "delete": "Usuń"
   },
   "trafficInspector": {
-    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
-    "imageOpenLink": "__MISSING__:Open link",
     "title": "Inspektor ruchu",
     "subtitle": "Monitoruj połączenia LLM i debuguj ruch HTTPS dowolnej aplikacji",
     "captureModesTitle": "Tryby przechwytywania",

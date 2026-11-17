@@ -13800,8 +13800,6 @@
     "delete": "מחק"
   },
   "trafficInspector": {
-    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
-    "imageOpenLink": "__MISSING__:Open link",
     "title": "מפקח תעבורה",
     "subtitle": "נטר קריאות LLM ונפה שגיאות בתעבורת ה-HTTPS של כל יישום",
     "captureModesTitle": "מצבי לכידה",

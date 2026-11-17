@@ -13800,8 +13800,6 @@
     "delete": "លុប"
   },
   "trafficInspector": {
-    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
-    "imageOpenLink": "__MISSING__:Open link",
     "title": "ឧបករណ៍ត្រួតពិនិត្យចរាចរណ៍",
     "subtitle": "តាមដានការហៅ LLM និងបំបាត់កំហុសចរាចរណ៍ HTTPS របស់កម្មវិធីណាមួយ",
     "captureModesTitle": "របៀបចាប់យក",

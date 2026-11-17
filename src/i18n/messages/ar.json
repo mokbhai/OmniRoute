@@ -13800,8 +13800,6 @@
     "delete": "حذف"
   },
   "trafficInspector": {
-    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
-    "imageOpenLink": "__MISSING__:Open link",
     "title": "فاحص حركة المرور",
     "subtitle": "مراقبة استدعاءات LLM وتصحيح أخطاء حركة مرور HTTPS لأي تطبيق",
     "captureModesTitle": "أوضاع الالتقاط",

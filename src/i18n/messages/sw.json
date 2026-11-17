@@ -13800,8 +13800,6 @@
     "delete": "Futa"
   },
   "trafficInspector": {
-    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
-    "imageOpenLink": "__MISSING__:Open link",
     "title": "Kikagua Trafiki",
     "subtitle": "Fuatilia miito ya LLM na utatue matatizo ya trafiki ya HTTPS ya programu yoyote",
     "captureModesTitle": "Njia za Kunasa",

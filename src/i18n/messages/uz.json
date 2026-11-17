@@ -13800,8 +13800,6 @@
     "delete": "O‘chirib tashlash"
   },
   "trafficInspector": {
-    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
-    "imageOpenLink": "__MISSING__:Open link",
     "title": "Trafik inspektori",
     "subtitle": "LLM chaqiruvlarini kuzating va istalgan ilovaning HTTPS trafigidagi nosozliklarni aniqlang",
     "captureModesTitle": "Tutib olish rejimlari",

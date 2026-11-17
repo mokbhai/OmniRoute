@@ -13800,8 +13800,6 @@
     "delete": "ลบ"
   },
   "trafficInspector": {
-    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
-    "imageOpenLink": "__MISSING__:Open link",
     "title": "ตัวตรวจสอบทราฟฟิก",
     "subtitle": "ตรวจสอบการเรียก LLM และดีบักทราฟฟิก HTTPS ของแอปพลิเคชันใดๆ",
     "captureModesTitle": "โหมดการดักจับ",

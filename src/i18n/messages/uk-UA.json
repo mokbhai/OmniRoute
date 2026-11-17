@@ -13800,8 +13800,6 @@
     "delete": "Видалити"
   },
   "trafficInspector": {
-    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
-    "imageOpenLink": "__MISSING__:Open link",
     "title": "Інспектор трафіку",
     "subtitle": "Моніторте виклики LLM та налагоджуйте HTTPS-трафік будь-якого застосунку",
     "captureModesTitle": "Режими перехоплення",

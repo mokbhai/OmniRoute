@@ -13800,8 +13800,6 @@
     "delete": "हटवा"
   },
   "trafficInspector": {
-    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
-    "imageOpenLink": "__MISSING__:Open link",
     "title": "ट्रॅफिक इन्स्पेक्टर",
     "subtitle": "LLM कॉल्सचे निरीक्षण करा आणि कोणत्याही ॲप्लिकेशनच्या HTTPS ट्रॅफिकचे डीबग करा",
     "captureModesTitle": "कॅप्चर मोड्स",
