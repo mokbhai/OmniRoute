@@ -535,7 +535,10 @@ test("resolvePreviousResponseState never lets the pending bridge cross tenants",
     responseId: "resp_gen-tenant-bridge",
     pipeline: {
       clientRawRequest: { body: { input: [{ role: "user", content: "secret" }] } },
-      clientResponse: { id: "resp_gen-tenant-bridge", output: [{ role: "assistant", content: "reply" }] },
+      clientResponse: {
+        id: "resp_gen-tenant-bridge",
+        output: [{ role: "assistant", content: "reply" }],
+      },
     },
   });
 
@@ -589,8 +592,13 @@ test("the pending bridge shares the durable path's fail-closed rules (video-reda
     responseId: "resp_gen-video-bridge",
     videoContentRemoved: true,
     pipeline: {
-      clientRawRequest: { body: { input: [{ role: "user", content: "[redacted-video-transcript]" }] } },
-      clientResponse: { id: "resp_gen-video-bridge", output: [{ role: "assistant", content: "ok" }] },
+      clientRawRequest: {
+        body: { input: [{ role: "user", content: "[redacted-video-transcript]" }] },
+      },
+      clientResponse: {
+        id: "resp_gen-video-bridge",
+        output: [{ role: "assistant", content: "ok" }],
+      },
     },
   });
 
@@ -602,7 +610,6 @@ test("the pending bridge shares the durable path's fail-closed rules (video-reda
 
   assert.equal(store.resolvePreviousResponseState("resp_gen-video-bridge", "key-1"), null);
 });
-
 
 // resolveTurnCompletionState / resolveConversationStalledState -- backs the
 // /dashboard/conversations "stalled" badge (live incident 2026-09-04: a
@@ -636,7 +643,10 @@ test("resolveTurnCompletionState returns 'tool_call_pending' for a completed str
     },
   });
 
-  assert.equal(store.resolveTurnCompletionState("2026-01-01/turn-tool-call.json"), "tool_call_pending");
+  assert.equal(
+    store.resolveTurnCompletionState("2026-01-01/turn-tool-call.json"),
+    "tool_call_pending"
+  );
 });
 
 test("resolveTurnCompletionState returns 'incomplete' for a collector-truncated stream (_truncated: true)", () => {
@@ -662,7 +672,10 @@ test("resolveTurnCompletionState returns 'incomplete' for a non-'completed' stat
     clientResponse: { summary: { status: "failed", output: [] } },
   });
 
-  assert.equal(store.resolveTurnCompletionState("2026-01-01/turn-failed-status.json"), "incomplete");
+  assert.equal(
+    store.resolveTurnCompletionState("2026-01-01/turn-failed-status.json"),
+    "incomplete"
+  );
 });
 
 test("resolveTurnCompletionState returns 'unknown' for a missing artifact", () => {
@@ -786,4 +799,118 @@ test("resolveConversationStalledState is false for a clean 'stop' turn no matter
     }),
     false
   );
+});
+
+// "stalled" badge (2026-11-17): resolveTurnCompletionState only knew the Responses-API
+// shape, so every finished /v1/chat/completions turn (summary.choices, no status/output)
+// read as "incomplete" and its conversation showed "stalled" 5 minutes later.
+test("turn completion: Chat Completions, Anthropic and Gemini replies use their own end reason", () => {
+  const cases: Array<[string, unknown, string]> = [
+    [
+      "chat-stop",
+      {
+        summary: { choices: [{ finish_reason: "stop", message: {} }], _streamed: true },
+        _streamed: true,
+      },
+      "stop",
+    ],
+    [
+      "chat-tools",
+      { summary: { choices: [{ finish_reason: "tool_calls", message: {} }] } },
+      "tool_call_pending",
+    ],
+    [
+      "chat-length",
+      { summary: { choices: [{ finish_reason: "length", message: {} }] } },
+      "incomplete",
+    ],
+    ["chat-cut", { summary: { choices: [{ finish_reason: null, message: {} }] } }, "incomplete"],
+    ["chat-nonstream", { choices: [{ finish_reason: "stop", message: {} }] }, "stop"],
+    [
+      "anthropic-end",
+      { summary: { type: "message", content: [], stop_reason: "end_turn" } },
+      "stop",
+    ],
+    [
+      "anthropic-tool",
+      { summary: { type: "message", content: [], stop_reason: "tool_use" } },
+      "tool_call_pending",
+    ],
+    [
+      "anthropic-max",
+      { summary: { type: "message", content: [], stop_reason: "max_tokens" } },
+      "incomplete",
+    ],
+    [
+      "gemini-stop",
+      { summary: { candidates: [{ finishReason: "STOP", content: { parts: [{ text: "x" }] } }] } },
+      "stop",
+    ],
+    [
+      "gemini-tool",
+      {
+        summary: {
+          candidates: [
+            { finishReason: "STOP", content: { parts: [{ functionCall: { name: "f" } }] } },
+          ],
+        },
+      },
+      "tool_call_pending",
+    ],
+    ["unknown-shape", { summary: { something: "else" } }, "unknown"],
+  ];
+  for (const [name, clientResponse, expected] of cases) {
+    const relPath = `2026-11-17/turn-completion-${name}.json`;
+    writeArtifact(relPath, { clientResponse });
+    assert.equal(store.resolveTurnCompletionState(relPath), expected, name);
+  }
+});
+
+test("a finished chat-completions conversation is not stalled; an unanswered tool call is", () => {
+  const old = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  writeArtifact("2026-11-17/stalled-chat-stop.json", {
+    clientResponse: { summary: { choices: [{ finish_reason: "stop", message: {} }] } },
+  });
+  writeArtifact("2026-11-17/stalled-chat-tools.json", {
+    clientResponse: { summary: { choices: [{ finish_reason: "tool_calls", message: {} }] } },
+  });
+  assert.equal(
+    store.resolveConversationStalledState({
+      artifactRelPath: "2026-11-17/stalled-chat-stop.json",
+      lastSeenAt: old,
+      isActive: false,
+    }),
+    false
+  );
+  assert.equal(
+    store.resolveConversationStalledState({
+      artifactRelPath: "2026-11-17/stalled-chat-tools.json",
+      lastSeenAt: old,
+      isActive: false,
+    }),
+    true
+  );
+});
+
+test("turn completion: Responses-API replies keep their existing classification", () => {
+  const cases: Array<[string, unknown, string]> = [
+    ["resp-done", { summary: { status: "completed", output: [{ type: "message" }] } }, "stop"],
+    [
+      "resp-tool",
+      { summary: { status: "completed", output: [{ type: "function_call" }] } },
+      "tool_call_pending",
+    ],
+    [
+      "resp-incomplete",
+      { summary: { status: "incomplete", output: [{ type: "message" }] } },
+      "incomplete",
+    ],
+    ["resp-empty", { id: "resp_x", output: [] }, "incomplete"],
+    ["resp-truncated", { _truncated: true }, "incomplete"],
+  ];
+  for (const [name, clientResponse, expected] of cases) {
+    const relPath = `2026-11-17/turn-completion-${name}.json`;
+    writeArtifact(relPath, { clientResponse });
+    assert.equal(store.resolveTurnCompletionState(relPath), expected, name);
+  }
 });
