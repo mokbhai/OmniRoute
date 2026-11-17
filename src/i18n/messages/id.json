@@ -13101,6 +13101,8 @@
     "delete": "Hapus"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Pemeriksa Lalu Lintas",
     "subtitle": "Pantau panggilan LLM dan debug lalu lintas HTTPS aplikasi apa pun",
     "captureModesTitle": "Mode Pengambilan",

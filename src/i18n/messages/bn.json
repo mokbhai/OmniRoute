@@ -13178,6 +13178,8 @@
     "delete": "মুছে ফেলুন"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "ট্র্যাফিক ইন্সপেক্টর",
     "subtitle": "LLM কল মনিটর করুন এবং যেকোনো অ্যাপ্লিকেশনের HTTPS ট্র্যাফিক ডিবাগ করুন",
     "captureModesTitle": "ক্যাপচার মোড",

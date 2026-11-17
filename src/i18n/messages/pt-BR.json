@@ -13101,6 +13101,8 @@
     "delete": "Excluir"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Inspector de Tráfego",
     "subtitle": "Monitore chamadas LLM e debugue o tráfego HTTPS de qualquer aplicação",
     "captureModesTitle": "Modos de Captura",

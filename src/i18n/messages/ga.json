@@ -13101,6 +13101,8 @@
     "delete": "Scrios"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Iniúchóir Tráchta",
     "subtitle": "Déan monatóireacht ar ghlaonna LLM agus dífhabhtaigh trácht HTTPS aon fheidhmchláir",
     "captureModesTitle": "Modhanna Gabhála",

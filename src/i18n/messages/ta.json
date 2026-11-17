@@ -13101,6 +13101,8 @@
     "delete": "நீக்கு"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "போக்குவரத்து ஆய்வுக் கருவி",
     "subtitle": "LLM அழைப்புகளைக் கண்காணிக்கவும் மற்றும் எந்தவொரு பயன்பாட்டின் HTTPS டிராஃபிக்கையும் பிழைத்திருத்தவும்",
     "captureModesTitle": "கேப்சர் முறைகள்",

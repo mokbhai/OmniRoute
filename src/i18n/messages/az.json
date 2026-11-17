@@ -13178,6 +13178,8 @@
     "delete": "Sil"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Trafik İnspektoru",
     "subtitle": "LLM çağırışlarını izləyin və istənilən tətbiqin HTTPS trafikindəki xətaları aradan qaldırın",
     "captureModesTitle": "Yaxalama Rejimləri",

@@ -13101,6 +13101,8 @@
     "delete": "Hichapụ"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Onye Nnyocha Ngagharị Data",
     "subtitle": "Nyochaa oku LLM ma chọpụta nsogbu dị na ngagharị data HTTPS nke ngwa ọ bụla",
     "captureModesTitle": "Ụdị Njide",

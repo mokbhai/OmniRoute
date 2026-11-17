@@ -13101,6 +13101,8 @@
     "delete": "Izbriši"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Pregledovalnik prometa",
     "subtitle": "Spremljajte klice LLM in odpravljajte napake v prometu HTTPS katere koli aplikacije",
     "captureModesTitle": "Načini zajema",

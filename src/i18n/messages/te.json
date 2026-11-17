@@ -13101,6 +13101,8 @@
     "delete": "తొలగించు"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "ట్రాఫిక్ ఇన్‌స్పెక్టర్",
     "subtitle": "LLM కాల్‌లను పర్యవేక్షించండి మరియు ఏదైనా అప్లికేషన్ యొక్క HTTPS ట్రాఫిక్‌ను డీబగ్ చేయండి",
     "captureModesTitle": "క్యాప్చర్ మోడ్‌లు",

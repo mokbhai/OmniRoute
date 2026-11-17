@@ -13101,6 +13101,8 @@
     "delete": "मेटाउनुहोस्"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "ट्राफिक निरीक्षक",
     "subtitle": "LLM कलहरू अनुगमन गर्नुहोस् र कुनै पनि एप्लिकेसनको HTTPS ट्राफिक डिबग गर्नुहोस्",
     "captureModesTitle": "क्याप्चर मोडहरू",

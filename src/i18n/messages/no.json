@@ -13101,6 +13101,8 @@
     "delete": "Slett"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Trafikkinspektør",
     "subtitle": "Overvåk LLM-kall og feilsøk HTTPS-trafikk fra alle applikasjoner",
     "captureModesTitle": "Fangstmoduser",

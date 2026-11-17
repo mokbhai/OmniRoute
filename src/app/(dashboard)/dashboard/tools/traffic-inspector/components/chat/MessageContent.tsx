@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import type { NormalizedBlock } from "@/mitm/inspector/types";
 import { ToolCallBlock } from "./ToolCallBlock";
 import { ToolResultBlock } from "./ToolResultBlock";
+import { ImageBlock } from "./ImageBlock";
 import MarkdownMessage from "@/app/(dashboard)/dashboard/playground/components/MarkdownMessage";
 
 interface MessageContentProps {
@@ -26,6 +27,9 @@ export function MessageContent({ blocks }: MessageContentProps) {
         }
         if (block.type === "tool_result") {
           return <ToolResultBlock key={i} toolUseId={block.tool_use_id} content={block.content} />;
+        }
+        if (block.type === "image") {
+          return <ImageBlock key={i} url={block.url} />;
         }
         if (block.type === "pending") {
           return (

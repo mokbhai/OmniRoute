@@ -13101,6 +13101,8 @@
     "delete": "ବିଲୋପ କରନ୍ତୁ"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "ଟ୍ରାଫିକ୍ ଇନ୍ସପେକ୍ଟର୍",
     "subtitle": "LLM କଲ୍ଗୁଡ଼ିକୁ ନିରୀକ୍ଷଣ କରନ୍ତୁ ଏବଂ ଯେକୌଣସି ଆପ୍ଲିକେସନ୍ର HTTPS ଟ୍ରାଫିକ୍କୁ ଡିବଗ୍ କରନ୍ତୁ",
     "captureModesTitle": "କ୍ୟାପ୍ଚର୍ ମୋଡ୍ଗୁଡ଼ିକ",

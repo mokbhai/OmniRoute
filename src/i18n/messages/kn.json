@@ -13101,6 +13101,8 @@
     "delete": "ಅಳಿಸಿ"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "ಟ್ರಾಫಿಕ್ ಪರಿಶೀಲಕ",
     "subtitle": "LLM ಕರೆಗಳನ್ನು ಮೇಲ್ವಿಚಾರಣೆ ಮಾಡಿ ಮತ್ತು ಯಾವುದೇ ಅಪ್ಲಿಕೇಶನ್ನ HTTPS ಟ್ರಾಫಿಕ್ ಅನ್ನು ಡೀಬಗ್ ಮಾಡಿ",
     "captureModesTitle": "ಕ್ಯಾಪ್ಚರ್ ಮೋಡ್ಗಳು",

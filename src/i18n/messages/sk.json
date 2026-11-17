@@ -13101,6 +13101,8 @@
     "delete": "Vymazať"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Inšpektor prevádzky",
     "subtitle": "Monitorujte volania LLM a laďte HTTPS prevádzku akejkoľvek aplikácie",
     "captureModesTitle": "Režimy zachytávania",

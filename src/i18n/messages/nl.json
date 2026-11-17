@@ -13101,6 +13101,8 @@
     "delete": "Verwijderen"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Verkeersinspecteur",
     "subtitle": "Monitor LLM-aanroepen en debug het HTTPS-verkeer van elke applicatie",
     "captureModesTitle": "Vastlegmodi",

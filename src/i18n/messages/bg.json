@@ -13178,6 +13178,8 @@
     "delete": "Изтриване"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Инспектор на трафика",
     "subtitle": "Наблюдавайте LLM извиквания и дебъгвайте HTTPS трафика на всяко приложение",
     "captureModesTitle": "Режими на прихващане",

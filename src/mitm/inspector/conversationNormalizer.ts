@@ -144,6 +144,43 @@ function reasoningBlocks(value: JsonRecord): NormalizedBlock[] {
   return blocks;
 }
 
+/** Only links a browser can show safely: http(s) or an inline data:image/ URI. */
+function safeImageUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const url = value.trim();
+  if (/^https?:\/\//i.test(url) || /^data:image\//i.test(url)) return url;
+  return null;
+}
+
+function imageBlock(part: JsonRecord, type: string): NormalizedBlock | null {
+  let url: string | null = null;
+  if (type === "image_url") {
+    // OpenAI chat: { image_url: { url } } (older clients send the URL as a string).
+    const imageUrl = part.image_url;
+    url = safeImageUrl(typeof imageUrl === "string" ? imageUrl : asRecord(imageUrl)?.url);
+  } else if (type === "input_image") {
+    // Responses API: { image_url: "<url>" }.
+    url = safeImageUrl(part.image_url);
+  } else if (type === "image") {
+    // Anthropic: { source: { type: "url", url } | { type: "base64", media_type, data } }.
+    const source = asRecord(part.source);
+    if (source?.type === "url") url = safeImageUrl(source.url);
+    else if (source?.type === "base64" && typeof source.data === "string") {
+      url = safeImageUrl(`data:${String(source.media_type || "image/png")};base64,${source.data}`);
+    }
+  } else {
+    // Gemini: { inlineData: { mimeType, data } } or { fileData: { fileUri, mimeType } }.
+    const inline = asRecord(part.inlineData);
+    const file = asRecord(part.fileData);
+    if (inline && typeof inline.data === "string" && /^image\//i.test(String(inline.mimeType))) {
+      url = safeImageUrl(`data:${String(inline.mimeType)};base64,${inline.data}`);
+    } else if (file && /^image\//i.test(String(file.mimeType))) {
+      url = safeImageUrl(file.fileUri);
+    }
+  }
+  return url ? { type: "image", url } : null;
+}
+
 function blocksFromPart(value: unknown): NormalizedBlock[] {
   if (typeof value === "string") {
     const block = textBlock(value);
@@ -162,6 +199,16 @@ function blocksFromPart(value: unknown): NormalizedBlock[] {
     return block ? [block] : [];
   }
   if (type === "reasoning") return reasoningBlocks(part);
+  if (
+    type === "image_url" ||
+    type === "input_image" ||
+    type === "image" ||
+    part.inlineData ||
+    part.fileData
+  ) {
+    const block = imageBlock(part, type);
+    return block ? [block] : [];
+  }
   if (
     type === "text" ||
     type === "input_text" ||
