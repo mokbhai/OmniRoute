@@ -13800,6 +13800,8 @@
     "delete": "I-delete"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Inspektor ng Trapiko",
     "subtitle": "I-monitor ang mga LLM call at i-debug ang HTTPS traffic ng anumang application",
     "captureModesTitle": "Mga Capture Mode",

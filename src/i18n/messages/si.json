@@ -13800,6 +13800,8 @@
     "delete": "මකන්න"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "ගමනාගමන පරීක්ෂකය",
     "subtitle": "LLM ඇමතුම් නිරීක්ෂණය කර ඕනෑම යෙදුමක HTTPS ගමනාගමනයේ දෝෂ නිරාකරණය කරන්න",
     "captureModesTitle": "ග්රහණ මාදිලි",

@@ -13800,6 +13800,8 @@
     "delete": "Obriši"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Inspektor saobraćaja",
     "subtitle": "Pratite LLM pozive i otklonite greške u HTTPS saobraćaju bilo koje aplikacije",
     "captureModesTitle": "Režimi snimanja",

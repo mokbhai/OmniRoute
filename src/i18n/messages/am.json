@@ -13800,6 +13800,8 @@
     "delete": "ሰርዝ"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "የትራፊክ መርማሪ",
     "subtitle": "የLLM ጥሪዎችን ይከታተሉ እና የማንኛውንም መተግበሪያ HTTPS ትራፊክ ስህተቶችን ይፈልጉና ያስተካክሉ",
     "captureModesTitle": "የቀረጻ ሁነታዎች",

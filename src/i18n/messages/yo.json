@@ -13800,6 +13800,8 @@
     "delete": "Parẹ́"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Ayẹ̀wò Ìrìnwọ́lé",
     "subtitle": "Ṣàbójútó àwọn ìpè LLM kí o sì ṣàtúnṣe àwọn ìṣòro inú ìrìnwọ́lé HTTPS ti èyíkéyìí ohun èlò",
     "captureModesTitle": "Àwọn Ìpo Gbigbasilẹ",

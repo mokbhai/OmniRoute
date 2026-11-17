@@ -13800,6 +13800,8 @@
     "delete": "刪除"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "流量檢查員",
     "subtitle": "監控 LLM 呼叫並除錯任何應用程式的 HTTPS 流量",
     "captureModesTitle": "捕獲模式",

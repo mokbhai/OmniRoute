@@ -13800,6 +13800,8 @@
     "delete": "Xóa"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Trình kiểm tra lưu lượng",
     "subtitle": "Giám sát các cuộc gọi LLM và gỡ lỗi lưu lượng HTTPS của bất kỳ ứng dụng nào",
     "captureModesTitle": "Chế độ thu thập",

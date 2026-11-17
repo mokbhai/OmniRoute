@@ -13800,6 +13800,8 @@
     "delete": "Goge"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Mai Binciken Zirga-zirga",
     "subtitle": "Sa ido kan kiran LLM da gyara matsalolin zirga-zirgar HTTPS na kowace manhaja",
     "captureModesTitle": "Yanayin Kamawa",

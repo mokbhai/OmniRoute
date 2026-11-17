@@ -13800,6 +13800,8 @@
     "delete": "ဖျက်ရန်"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "အသွားအလာ စစ်ဆေးကိရိယာ",
     "subtitle": "LLM ခေါ်ဆိုမှုများကို စောင့်ကြည့်ပြီး မည်သည့်အက်ပ်၏ HTTPS အသွားအလာကိုမဆို အမှားရှာဖွေပါ",
     "captureModesTitle": "ဖမ်းယူမှု ပုံစံများ",

@@ -13800,6 +13800,8 @@
     "delete": "Padam"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Pemeriksa Trafik",
     "subtitle": "Pantau panggilan LLM dan nyahpepijat trafik HTTPS mana-mana aplikasi",
     "captureModesTitle": "Mod Tangkapan",

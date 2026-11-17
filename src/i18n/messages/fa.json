@@ -13800,6 +13800,8 @@
     "delete": "حذف"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "بازرس ترافیک",
     "subtitle": "نظارت بر فراخوانی‌های LLM و اشکال‌زدایی ترافیک HTTPS هر برنامه‌ای",
     "captureModesTitle": "حالت‌های ضبط",

@@ -301,3 +301,82 @@ test("parses SSE response to extract OpenAI delta", () => {
   assert.ok(conv.response.length >= 1);
   assert.equal(conv.response[0].role, "assistant");
 });
+
+// Images the client sent were dropped by blocksFromPart, so the request-detail
+// "Conversation context" never showed them (2026-11-17: an OpenAI image_url request
+// rendered only its text).
+test("keeps image parts from OpenAI, Responses, Anthropic and Gemini requests", () => {
+  const url = "https://files.example.com/a.jpg?X-Amz-Signature=abc";
+  const imagesOf = (body: unknown) =>
+    (normalizeConversation(makeReq({ requestBody: JSON.stringify(body) }))?.request ?? [])
+      .flatMap((t) => t.blocks)
+      .filter((b) => b.type === "image");
+
+  assert.deepEqual(
+    imagesOf({
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Describe this" },
+            { type: "image_url", image_url: { url } },
+          ],
+        },
+      ],
+    }),
+    [{ type: "image", url }]
+  );
+  assert.deepEqual(
+    imagesOf({
+      input: [{ role: "user", content: [{ type: "input_image", image_url: url }] }],
+    }),
+    [{ type: "image", url }]
+  );
+  assert.deepEqual(
+    imagesOf({
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: "image/png", data: "iVBOR" } },
+          ],
+        },
+      ],
+    }),
+    [{ type: "image", url: "data:image/png;base64,iVBOR" }]
+  );
+  assert.deepEqual(
+    imagesOf({
+      contents: [
+        { role: "user", parts: [{ inlineData: { mimeType: "image/jpeg", data: "/9j/" } }] },
+      ],
+    }),
+    [{ type: "image", url: "data:image/jpeg;base64,/9j/" }]
+  );
+});
+
+test("drops image parts whose URL a browser should not load", () => {
+  for (const bad of ["javascript:alert(1)", "file:///etc/passwd", "gs://bucket/x.png", ""]) {
+    const conv = normalizeConversation(
+      makeReq({
+        requestBody: JSON.stringify({
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "hi" },
+                { type: "image_url", image_url: { url: bad } },
+              ],
+            },
+          ],
+        }),
+      })
+    );
+    const blocks = (conv?.request ?? []).flatMap((t) => t.blocks);
+    assert.equal(
+      blocks.some((b) => b.type === "image"),
+      false,
+      bad
+    );
+  }
+});

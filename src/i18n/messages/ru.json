@@ -13800,6 +13800,8 @@
     "delete": "Удалить"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Инспектор Трафика",
     "subtitle": "Мониторинг вызовов LLM и отладка HTTPS-трафика любого приложения",
     "captureModesTitle": "Режимы захвата",

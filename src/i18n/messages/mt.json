@@ -13800,6 +13800,8 @@
     "delete": "Ħassar"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "Spettur tat-Traffiku",
     "subtitle": "Immonitorja s-sejħiet LLM u sib il-problemi fit-traffiku HTTPS ta’ kwalunkwe applikazzjoni",
     "captureModesTitle": "Modi ta’ Qbid",

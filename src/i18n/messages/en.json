@@ -13800,6 +13800,8 @@
     "delete": "Delete"
   },
   "trafficInspector": {
+    "imageUnavailable": "Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "Open link",
     "title": "Traffic Inspector",
     "subtitle": "Monitor LLM calls and debug any application's HTTPS traffic",
     "captureModesTitle": "Capture Modes",

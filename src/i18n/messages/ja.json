@@ -13800,6 +13800,8 @@
     "delete": "削除"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "トラフィックインスペクター",
     "subtitle": "LLM呼び出しを監視し、アプリケーションのHTTPSトラフィックをデバッグします",
     "captureModesTitle": "キャプチャモード",

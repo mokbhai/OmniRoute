@@ -13800,6 +13800,8 @@
     "delete": "ഇല്ലാതാക്കുക"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "ട്രാഫിക് ഇൻസ്പെക്ടർ",
     "subtitle": "LLM കോളുകൾ നിരീക്ഷിക്കുകയും ഏതൊരു ആപ്ലിക്കേഷന്റെയും HTTPS ട്രാഫിക് ഡീബഗ് ചെയ്യുകയും ചെയ്യുക",
     "captureModesTitle": "ക്യാപ്ചർ മോഡുകൾ",

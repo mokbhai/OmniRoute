@@ -70,6 +70,10 @@ export type NormalizedBlock =
   | { type: "text"; text: string }
   | { type: "tool_use"; id: string; name: string; input: unknown }
   | { type: "tool_result"; tool_use_id: string; content: unknown }
+  // An image the client sent (OpenAI image_url, Responses input_image, Anthropic image,
+  // Gemini inlineData/fileData). `url` is an http(s) link or a data:image/ URI; anything
+  // else is dropped by the normalizer, so the renderer never sees javascript:/file: URLs.
+  | { type: "image"; url: string }
   // A tool identity node whose display content hasn't resolved from its
   // call-log artifact yet (see resolveTurnDisplayContent /
   // /api/conversations/[id]/tree's own doc comment) -- distinct from a real

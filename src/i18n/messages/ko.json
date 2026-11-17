@@ -13800,6 +13800,8 @@
     "delete": "삭제"
   },
   "trafficInspector": {
+    "imageUnavailable": "__MISSING__:Image unavailable (the link may have expired, or it was not stored).",
+    "imageOpenLink": "__MISSING__:Open link",
     "title": "트래픽 인스펙터",
     "subtitle": "LLM 호출을 모니터링하고 모든 애플리케이션의 HTTPS 트래픽을 디버그합니다",
     "captureModesTitle": "캡처 모드",
