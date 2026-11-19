@@ -28,17 +28,18 @@ security control.
 
 ## Built-in Guardrails
 
-The registry auto-loads six guardrails in priority order on import
+The registry auto-loads seven guardrails in priority order on import
 (see `registry.ts` → `registerDefaultGuardrails()`):
 
-| Priority | Name                | Stage(s)       | File                  |
-| -------- | ------------------- | -------------- | --------------------- |
-| `5`      | `vision-bridge`     | `preCall`      | `visionBridge.ts`     |
-| `6`      | `audio-bridge`      | `preCall`      | `audioBridge.ts`      |
-| `7`      | `video-bridge`      | `preCall`      | `videoBridge.ts`      |
-| `10`     | `pii-masker`        | `pre` + `post` | `piiMasker.ts`        |
-| `20`     | `prompt-injection`  | `preCall`      | `promptInjection.ts`  |
-| `95`     | `credential-masker` | `pre` + `post` | `credentialMasker.ts` |
+| Priority | Name                | Stage(s)       | File                         |
+| -------- | ------------------- | -------------- | ---------------------------- |
+| `5`      | `vision-bridge`     | `preCall`      | `visionBridge.ts`            |
+| `6`      | `audio-bridge`      | `preCall`      | `audioBridge.ts`             |
+| `7`      | `video-bridge`      | `preCall`      | `videoBridge.ts`             |
+| `10`     | `pii-masker`        | `pre` + `post` | `piiMasker.ts`               |
+| `20`     | `prompt-injection`  | `preCall`      | `promptInjection.ts`         |
+| `95`     | `credential-masker` | `pre` + `post` | `credentialMasker.ts`        |
+| `40`     | `content-policy`    | `preCall`      | `contentPolicy/guardrail.ts` |
 
 Lower priority numbers run **first**.
 
@@ -939,6 +940,100 @@ to the upstream provider or back to the client.
 
 Regression guard: `tests/unit/credential-masker-guardrail.test.ts`.
 
+### Content Policy (`contentPolicy/`)
+
+Detects adult/sexual requests and reroutes, blocks, or flags them. **Off by
+default.** Runs last among the pre-call guardrails (priority `40`), so its model
+choice is the final one.
+
+**Two stages, cheapest first.**
+
+1. **Keyword score** on every request (`contentPolicy/keywordScore.ts`, local, no
+   network). The score is the sum of the weights of the distinct lexicon terms
+   found in the system prompt, instructions, messages and Responses `input`
+   (images and audio are skipped; text over 32 000 characters keeps its head and
+   tail halves). Weights: `5` explicit acts / porn terms, `3` strong signals
+   (nudity, sex positions, fetish), `1` weak signals that are common in ordinary
+   text (`sexy`, `penetration`). The lexicon covers English, Portuguese, Spanish,
+   Chinese (simplified and traditional) and some Japanese.
+2. **Moderator**, only for the middle band. The score is placed in a band:
+
+   | Keyword score                           | Band     | Moderator called? | Outcome               |
+   | --------------------------------------- | -------- | ----------------- | --------------------- |
+   | `< lowThreshold`                        | `below`  | no                | clean, passes         |
+   | `>= lowThreshold` and `< highThreshold` | `middle` | **yes**           | moderator decides     |
+   | `>= highThreshold`                      | `above`  | no                | adult, action applies |
+
+   The moderator call goes through the same code as `POST /v1/moderations`
+   (`handleModeration()` plus the provider's configured connection), so
+   `moderatorModel` must be a moderation model OmniRoute already has
+   credentials for: `openai/omni-moderation-latest`,
+   `openai/text-moderation-latest`, or `mistral/mistral-moderation-latest`. The
+   request is adult when the highest `sexual*` category score is
+   `>= moderationScoreThreshold`. Verdicts are cached for 10 minutes by a hash of
+   (model, text). If the moderator is missing or fails, the request **fails
+   open** and `meta.moderatorError` records why.
+
+**Action for an adult request (`mode`).**
+
+- `reroute` (default): the payload `model` becomes `rerouteTarget` (a model or a
+  combo). `chat.ts` applies the switch through `reconcileGuardrailReroute()`, the
+  same path as the vision bridge reroute: if the caller's API key may not use the
+  target, the original model is kept and a `POLICY` warning is logged. With no
+  `rerouteTarget` the request passes (`action: "no_reroute_target"`).
+- `block`: HTTP 400 `Request rejected by content policy`.
+- `flag`: the request passes unchanged; only the decision is recorded.
+
+**Configuration.** One settings key, `contentPolicy`, written with
+`PATCH /api/settings` (the whole object is replaced on each write):
+
+```json
+{
+  "contentPolicy": {
+    "enabled": true,
+    "mode": "reroute",
+    "lowThreshold": 3,
+    "highThreshold": 10,
+    "moderatorModel": "openai/omni-moderation-latest",
+    "moderationScoreThreshold": 0.5,
+    "rerouteTarget": "combo/nsfw-ok",
+    "keyOverrides": {
+      "<apiKeyId>": { "enabled": true, "rerouteTarget": "grok/grok-4" }
+    }
+  }
+}
+```
+
+Defaults: `enabled: false`, `mode: "reroute"`, `lowThreshold: 3`,
+`highThreshold: 10`, `moderationScoreThreshold: 0.5`, no moderator, no target.
+`lowThreshold` must be lower than `highThreshold` (Zod:
+`src/shared/validation/contentPolicySchema.ts`).
+
+**Scope: global and per API key.** Every field can be set globally and per key
+under `keyOverrides`, keyed by API key id. Precedence is **per field**: per-key
+value → global value → default. A field missing from the key's entry inherits
+the global value (the same "inherit" rule as the API key `codexServiceMode`). So
+a key can turn the policy on while it is off globally, turn it off while it is
+on globally, or use its own target, moderator or band. `meta.scope` is `"key"`
+when the caller's key has an override entry. The guardrail can also be skipped
+per request like any other (`x-omniroute-disabled-guardrails: content-policy`).
+
+**Transparency.** The decision is returned in the guardrail result `meta`
+(`adult`, `stage`, `band`, `keywordScore`, `matchedTerms`, `moderatorModel`,
+`moderatorScore`, `scope`, `action`, `fromModel`, `toModel`) and on the response
+as `x-omniroute-content-policy`, for example
+`adult; stage=moderator; action=rerouted; score=3; moderator=0.910`. Logs carry
+scores and the action, never request text. `matchedTerms` lists lexicon
+entries only.
+
+**Limits.** Requests only: the check runs before the upstream call, so a response
+that turns explicit is not caught. If the vision bridge already rerouted an image
+request to a vision model and the content policy then reroutes it, the content
+policy target wins; pick a vision-capable target if your adult traffic carries
+images.
+
+Regression guard: `tests/unit/guardrails/contentPolicy.test.ts`.
+
 ## Base Contract (`base.ts`)
 
 ```typescript
@@ -1134,6 +1229,9 @@ Environment variables read by the built-in guardrails:
 | `PII_REDACTION_ENABLED`               | `pii-masker`               | When `true`, request PII is redacted (independent of injection mode).                               |
 | `PII_REVERSIBLE_VAULT_ENABLED`        | `pii-masker`, `handleChat` | With `PII_REDACTION_ENABLED`, mint reversible tokens and restore them in 2xx responses.             |
 | `PII_RESPONSE_SANITIZATION` / `_MODE` | `pii-masker` (downstream)  | Controls response-side masker behavior.                                                             |
+
+The content-policy guardrail reads the `contentPolicy` settings key (see
+[Content Policy](#content-policy-contentpolicy)).
 
 The Modality Bridge guardrails read runtime config from the DB-backed settings
 store (`getSettings()`), not env vars. Vision's primary keys are

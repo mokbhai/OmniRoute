@@ -83,7 +83,7 @@ test("guardrails barrel (src/lib/guardrails/index.ts) exports exactly this surfa
   ]);
 });
 
-test("importing the barrel registers the six default guardrails in priority order", () => {
+test("importing the barrel registers the seven default guardrails in priority order", () => {
   assert.deepEqual(
     guardrailRegistry.list().map((g) => [g.name, g.priority, g.enabled]),
     [
@@ -93,6 +93,7 @@ test("importing the barrel registers the six default guardrails in priority orde
       ["credential-masker", 9, true],
       ["pii-masker", 10, true],
       ["prompt-injection", 20, true],
+      ["content-policy", 40, true],
     ]
   );
 });
