@@ -1,10 +1,10 @@
 import { buildModalityBridgeHeader } from "./bridgeStats";
 import { VIDEO_DRILLDOWN_HANDLE_PATTERN } from "../videoBridgeDrilldownHandle";
-import { buildContentPolicyHeader } from "../contentPolicy/header";
+import { buildTextPolicyHeader, TEXT_POLICY_HEADER } from "@/lib/textPolicy/header";
 
 export type ModalityBridgeResponseHeaders = Partial<
   Record<
-    "x-omniroute-modality-bridge" | "x-omniroute-video-drilldown" | "x-omniroute-content-policy",
+    "x-omniroute-modality-bridge" | "x-omniroute-video-drilldown" | "x-omniroute-text-policy",
     string
   >
 >;
@@ -35,8 +35,8 @@ export function buildModalityBridgeResponseHeaders(
     appendDrilldownHandles(handles, result.meta.videoDrilldownHandles);
   }
   if (handles.size) headers["x-omniroute-video-drilldown"] = [...handles].join(",");
-  const contentPolicy = buildContentPolicyHeader(results);
-  if (contentPolicy) headers["x-omniroute-content-policy"] = contentPolicy;
+  const textPolicy = buildTextPolicyHeader(results);
+  if (textPolicy) headers[TEXT_POLICY_HEADER] = textPolicy;
   return Object.keys(headers).length ? headers : null;
 }
 

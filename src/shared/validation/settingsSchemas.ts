@@ -18,7 +18,7 @@ import { HIDEABLE_SIDEBAR_GROUP_IDS } from "@/shared/constants/sidebarGroupVisib
 import { HIDEABLE_SIDEBAR_ITEM_IDS, SIDEBAR_SECTIONS } from "@/shared/constants/sidebarVisibility";
 import { ACCOUNT_FALLBACK_STRATEGY_VALUES } from "@/shared/constants/routingStrategies";
 import { RESPONSES_PREVIOUS_RESPONSE_ID_MODES } from "@/shared/constants/responsesPreviousResponseId";
-import { contentPolicySettingsSchema } from "@/shared/validation/contentPolicySchema";
+import { textPoliciesSettingsSchema } from "@/shared/validation/textPolicySchema";
 import {
   VIDEO_BRIDGE_TIMEOUT_MAX_MS,
   VIDEO_BRIDGE_TIMEOUT_MIN_MS,
@@ -609,9 +609,9 @@ export const updateSettingsSchema = z.object({
   // models.dev sync settings
   modelsDevSyncEnabled: z.boolean().optional(),
   modelsDevSyncInterval: z.number().int().min(3600000).max(604800000).optional(),
-  // Content policy guardrail: keyword score -> moderator (middle band) -> reroute/block/flag.
-  // Global fields plus per-API-key `keyOverrides` (see src/lib/guardrails/contentPolicy.ts).
-  contentPolicy: contentPolicySettingsSchema.optional(),
+  // Text policies (src/lib/textPolicy/): keyword score -> moderator (middle band) ->
+  // reroute/block/flag, keyed by policy id, with per-API-key `keyOverrides`.
+  textPolicies: textPoliciesSettingsSchema.optional(),
   // Vision Bridge settings
   visionBridgeEnabled: z.boolean().optional(),
   visionBridgeModel: z.string().max(200).optional(),

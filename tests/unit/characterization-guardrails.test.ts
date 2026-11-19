@@ -93,7 +93,7 @@ test("importing the barrel registers the seven default guardrails in priority or
       ["credential-masker", 9, true],
       ["pii-masker", 10, true],
       ["prompt-injection", 20, true],
-      ["content-policy", 40, true],
+      ["text-policy", 40, true],
     ]
   );
 });

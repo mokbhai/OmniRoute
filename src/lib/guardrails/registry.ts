@@ -10,7 +10,7 @@ import { VisionBridgeGuardrail } from "./visionBridge";
 import { AudioBridgeGuardrail } from "./audioBridge";
 import { VideoBridgeGuardrail } from "./videoBridge";
 import { CredentialMaskerGuardrail } from "./credentialMasker";
-import { ContentPolicyGuardrail } from "./contentPolicy/guardrail";
+import { TextPolicyGuardrail } from "./textPolicy";
 
 /**
  * `preCall`/`postCall` may legitimately return nothing — that is the documented
@@ -313,7 +313,7 @@ export function registerDefaultGuardrails() {
   guardrailRegistry.register(new PIIMaskerGuardrail());
   guardrailRegistry.register(new CredentialMaskerGuardrail());
   guardrailRegistry.register(new PromptInjectionGuardrail());
-  guardrailRegistry.register(new ContentPolicyGuardrail());
+  guardrailRegistry.register(new TextPolicyGuardrail());
   defaultGuardrailsRegistered = true;
 
   return guardrailRegistry;
