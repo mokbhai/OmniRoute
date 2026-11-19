@@ -91,7 +91,7 @@ export default function TextPolicyTerms({ policyId, onChanged }: TextPolicyTerms
   const visible = terms?.filter((term) => term.status === status) ?? [];
 
   return (
-    <Card title={t("textPolicyTermsTitle")} subtitle={t("textPolicyTermsDesc")} icon="spellcheck">
+    <Card title={t("textPolicyTermsTitle")} subtitle={t("textPolicyTermsDesc")} icon="psychology">
       <div className="space-y-4" data-testid="text-policy-terms">
         <Tabs
           variant="underline"
@@ -137,21 +137,23 @@ export default function TextPolicyTerms({ policyId, onChanged }: TextPolicyTerms
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Select
-                    compact
-                    aria-label={t("textPolicyTermWeight")}
-                    value={String(term.weight)}
-                    options={WEIGHTS}
-                    disabled={busyTerm === term.term}
-                    onChange={(event) =>
-                      void run(term.term, () =>
-                        upsertTerm(policyId, {
-                          term: term.term,
-                          weight: Number(event.target.value),
-                        })
-                      )
-                    }
-                  />
+                  <div className="w-20">
+                    <Select
+                      compact
+                      aria-label={t("textPolicyTermWeight")}
+                      value={String(term.weight)}
+                      options={WEIGHTS}
+                      disabled={busyTerm === term.term}
+                      onChange={(event) =>
+                        void run(term.term, () =>
+                          upsertTerm(policyId, {
+                            term: term.term,
+                            weight: Number(event.target.value),
+                          })
+                        )
+                      }
+                    />
+                  </div>
                   {term.status !== "active" && (
                     <Button
                       size="sm"
@@ -211,12 +213,14 @@ export default function TextPolicyTerms({ policyId, onChanged }: TextPolicyTerms
               if (event.key === "Enter") void addTerm();
             }}
           />
-          <Select
-            label={t("textPolicyTermWeight")}
-            value={newWeight}
-            options={WEIGHTS}
-            onChange={(event) => setNewWeight(event.target.value)}
-          />
+          <div className="w-full sm:w-28">
+            <Select
+              label={t("textPolicyTermWeight")}
+              value={newWeight}
+              options={WEIGHTS}
+              onChange={(event) => setNewWeight(event.target.value)}
+            />
+          </div>
           <Button icon="add" disabled={!newTerm.trim()} onClick={() => void addTerm()}>
             {t("textPolicyTermAddButton")}
           </Button>
