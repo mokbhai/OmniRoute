@@ -142,12 +142,12 @@ export default function TextPoliciesManager() {
   if (!policies) return <CardSkeleton />;
 
   return (
-    <div className="space-y-4" data-testid="text-policies-manager">
+    <div className="space-y-4" data-testid="tpol-manager">
       {notice && (
         <p
           role={notice.tone === "error" ? "alert" : "status"}
           className={`text-sm ${notice.tone === "error" ? "text-error" : "text-text-muted"}`}
-          data-testid="text-policy-notice"
+          data-testid="tpol-notice"
         >
           {notice.text}
         </p>

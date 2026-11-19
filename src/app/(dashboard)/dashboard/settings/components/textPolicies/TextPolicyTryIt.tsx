@@ -49,12 +49,12 @@ export default function TextPolicyTryIt({ policyId, apiKeys }: TextPolicyTryItPr
 
   return (
     <Card title={t("textPolicyTryTitle")} subtitle={t("textPolicyTryDesc")} icon="science">
-      <div className="space-y-4" data-testid="text-policy-try">
+      <div className="space-y-4" data-testid="tpol-try">
         <Textarea
           rows={5}
           label={t("textPolicyTryText")}
           value={text}
-          data-testid="text-policy-try-text"
+          data-testid="tpol-try-text"
           onChange={(event) => setText(event.target.value)}
         />
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -79,7 +79,7 @@ export default function TextPolicyTryIt({ policyId, apiKeys }: TextPolicyTryItPr
             icon="play_arrow"
             loading={running}
             disabled={!text.trim()}
-            data-testid="text-policy-try-run"
+            data-testid="tpol-try-run"
             onClick={() => void run()}
           >
             {t("textPolicyTryRun")}
@@ -95,7 +95,7 @@ export default function TextPolicyTryIt({ policyId, apiKeys }: TextPolicyTryItPr
         {decision && (
           <div
             className="space-y-3 rounded-md border border-border p-3"
-            data-testid="text-policy-try-result"
+            data-testid="tpol-try-result"
           >
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={decision.violation ? "error" : "success"}>

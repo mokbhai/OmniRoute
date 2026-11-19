@@ -122,7 +122,7 @@ export default function TextPolicyKeyOverrides({
       subtitle={t("textPolicyOverridesDesc", { policy: policyLabel })}
       icon="key"
     >
-      <div className="space-y-4" data-testid="text-policy-overrides">
+      <div className="space-y-4" data-testid="tpol-overrides">
         {overriddenIds.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {overriddenIds.map((id) => (
@@ -142,7 +142,7 @@ export default function TextPolicyKeyOverrides({
           label={t("textPolicyApiKey")}
           value={selectedKey}
           options={keyOptions}
-          data-testid="text-policy-override-key"
+          data-testid="tpol-override-key"
           onChange={(event) => selectKey(event.target.value)}
         />
 
@@ -157,7 +157,7 @@ export default function TextPolicyKeyOverrides({
                   { value: "true", label: t("textPolicyOn") },
                   { value: "false", label: t("textPolicyOff") },
                 ]}
-                data-testid="text-policy-override-enabled"
+                data-testid="tpol-override-enabled"
                 onChange={(event) => set({ enabled: event.target.value })}
               />
               <Select
@@ -204,7 +204,7 @@ export default function TextPolicyKeyOverrides({
                 label={t("textPolicyRerouteTarget")}
                 placeholder={inheritLabel(global.rerouteTarget ?? t("textPolicyNone"))}
                 value={form.rerouteTarget}
-                data-testid="text-policy-override-target"
+                data-testid="tpol-override-target"
                 onChange={(event) => set({ rerouteTarget: event.target.value })}
               />
               <Select
@@ -247,7 +247,7 @@ export default function TextPolicyKeyOverrides({
                 variant="primary"
                 icon="save"
                 loading={saving}
-                data-testid="text-policy-override-save"
+                data-testid="tpol-override-save"
                 onClick={() => void save(false)}
               >
                 {t("textPolicySaveOverride")}

@@ -92,7 +92,7 @@ export default function TextPolicyTerms({ policyId, onChanged }: TextPolicyTerms
 
   return (
     <Card title={t("textPolicyTermsTitle")} subtitle={t("textPolicyTermsDesc")} icon="psychology">
-      <div className="space-y-4" data-testid="text-policy-terms">
+      <div className="space-y-4" data-testid="tpol-terms">
         <Tabs
           variant="underline"
           value={status}
@@ -100,7 +100,7 @@ export default function TextPolicyTerms({ policyId, onChanged }: TextPolicyTerms
         >
           <TabsList aria-label={t("textPolicyTermsTabsAria")}>
             {STATUSES.map((value) => (
-              <TabsTrigger key={value} value={value} data-testid={`text-policy-terms-tab-${value}`}>
+              <TabsTrigger key={value} value={value} data-testid={`tpol-terms-tab-${value}`}>
                 {t(`textPolicyTermStatus_${value}`)} ({counts[value]})
               </TabsTrigger>
             ))}
@@ -125,7 +125,7 @@ export default function TextPolicyTerms({ policyId, onChanged }: TextPolicyTerms
               <li
                 key={term.term}
                 className="flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between"
-                data-testid={`text-policy-term-${term.term}`}
+                data-testid={`tpol-term-${term.term}`}
               >
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="font-medium break-all">{term.term}</span>
@@ -160,7 +160,7 @@ export default function TextPolicyTerms({ policyId, onChanged }: TextPolicyTerms
                       variant="outline"
                       icon="check"
                       disabled={busyTerm === term.term}
-                      data-testid={`text-policy-term-approve-${term.term}`}
+                      data-testid={`tpol-term-approve-${term.term}`}
                       onClick={() =>
                         void run(term.term, () =>
                           upsertTerm(policyId, { term: term.term, status: "active" })
@@ -176,7 +176,7 @@ export default function TextPolicyTerms({ policyId, onChanged }: TextPolicyTerms
                       variant="outline"
                       icon="block"
                       disabled={busyTerm === term.term}
-                      data-testid={`text-policy-term-reject-${term.term}`}
+                      data-testid={`tpol-term-reject-${term.term}`}
                       onClick={() =>
                         void run(term.term, () =>
                           upsertTerm(policyId, { term: term.term, status: "rejected" })
@@ -207,7 +207,7 @@ export default function TextPolicyTerms({ policyId, onChanged }: TextPolicyTerms
             placeholder={t("textPolicyTermAddPlaceholder")}
             value={newTerm}
             maxLength={48}
-            data-testid="text-policy-term-new"
+            data-testid="tpol-term-new"
             onChange={(event) => setNewTerm(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") void addTerm();

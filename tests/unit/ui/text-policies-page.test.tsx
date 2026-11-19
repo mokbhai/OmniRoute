@@ -181,10 +181,10 @@ describe("Text Policies settings page", () => {
   it("1 · lists policies and toggles one on", async () => {
     const { calls } = setupApi();
     await render(<TextPoliciesManager />);
-    expect(q('[data-testid="text-policy-row-sexual-content"]').textContent).toContain(
+    expect(q('[data-testid="tpol-row-sexual-content"]').textContent).toContain(
       "Sexual / adult content"
     );
-    await click(q('[data-testid="text-policy-list"] [role="switch"]'));
+    await click(q('[data-testid="tpol-list"] [role="switch"]'));
     const patch = lastPatch(calls);
     expect(patch?.textPolicies["sexual-content"].enabled).toBe(true);
     expect(patch?.textPolicies["sexual-content"].keyOverrides).toEqual({ k1: { enabled: true } });
@@ -193,19 +193,19 @@ describe("Text Policies settings page", () => {
   it("2 · editor rejects an inverted band and saves valid fields", async () => {
     const { calls } = setupApi();
     await render(<TextPoliciesManager />);
-    await act(async () => setValue(field("text-policy-low"), "12"));
-    await click(q('[data-testid="text-policy-save"]'));
-    expect(q('[data-testid="text-policy-error"]').textContent).toBe("textPolicyErrorBand");
+    await act(async () => setValue(field("tpol-low"), "12"));
+    await click(q('[data-testid="tpol-save"]'));
+    expect(q('[data-testid="tpol-error"]').textContent).toBe("textPolicyErrorBand");
     expect(lastPatch(calls)).toBeUndefined();
 
-    await act(async () => setValue(field("text-policy-low"), "2"));
+    await act(async () => setValue(field("tpol-low"), "2"));
     await click(
       [...document.body.querySelectorAll("button")].find((button) =>
         button.textContent?.includes("textPolicyDefinitionTitle")
       )!
     );
-    await act(async () => setValue(field("text-policy-seed-terms"), "onlyfans:3\nthirst trap"));
-    await click(q('[data-testid="text-policy-save"]'));
+    await act(async () => setValue(field("tpol-seed-terms"), "onlyfans:3\nthirst trap"));
+    await click(q('[data-testid="tpol-save"]'));
     const saved = lastPatch(calls)?.textPolicies["sexual-content"];
     expect(saved?.lowThreshold).toBe(2);
     expect(saved?.highThreshold).toBe(10);
@@ -219,8 +219,8 @@ describe("Text Policies settings page", () => {
   it("3 · saves a per-key override and leaves blank fields inherited", async () => {
     const { calls } = setupApi();
     await render(<TextPoliciesManager />);
-    await act(async () => setValue(field("text-policy-override-target"), "grok/grok-4"));
-    await click(q('[data-testid="text-policy-override-save"]'));
+    await act(async () => setValue(field("tpol-override-target"), "grok/grok-4"));
+    await click(q('[data-testid="tpol-override-save"]'));
     expect(lastPatch(calls)?.textPolicies["sexual-content"].keyOverrides).toEqual({
       k1: { enabled: true, rerouteTarget: "grok/grok-4" },
     });
@@ -229,8 +229,8 @@ describe("Text Policies settings page", () => {
   it("4 · approves a pending learned word", async () => {
     const { calls } = setupApi();
     await render(<TextPoliciesManager />);
-    expect(q('[data-testid="text-policy-term-freaky"]').textContent).toContain("freaky");
-    await click(q('[data-testid="text-policy-term-approve-freaky"]'));
+    expect(q('[data-testid="tpol-term-freaky"]').textContent).toContain("freaky");
+    await click(q('[data-testid="tpol-term-approve-freaky"]'));
     const put = calls.find((call) => call.method === "PUT");
     expect(put?.url).toBe("/api/text-policies/sexual-content/terms");
     expect(put?.body).toEqual({ term: "freaky", status: "active" });
@@ -239,15 +239,15 @@ describe("Text Policies settings page", () => {
   it("5 · try it runs a dry-run evaluation and shows the verdict", async () => {
     const { calls } = setupApi();
     await render(<TextPoliciesManager />);
-    await act(async () => setValue(field("text-policy-try-text"), "porn, blowjob"));
-    await click(q('[data-testid="text-policy-try-run"]'));
+    await act(async () => setValue(field("tpol-try-text"), "porn, blowjob"));
+    await click(q('[data-testid="tpol-try-run"]'));
     const evaluate = calls.find((call) => call.url.endsWith("/evaluate"));
     expect(evaluate?.body).toMatchObject({
       text: "porn, blowjob",
       ignoreEnabled: true,
       learn: false,
     });
-    const result = q('[data-testid="text-policy-try-result"]').textContent ?? "";
+    const result = q('[data-testid="tpol-try-result"]').textContent ?? "";
     expect(result).toContain("textPolicyTryViolation");
     expect(result).toContain("textPolicyBand_above");
     expect(result).toContain("blowjob");
@@ -261,18 +261,16 @@ describe("Text Policies settings page", () => {
         (button) => button.textContent === "textPolicyNew"
       )!
     );
-    await act(async () => setValue(field("text-policy-new-id"), "sexual-content"));
+    await act(async () => setValue(field("tpol-new-id"), "sexual-content"));
     await act(async () =>
-      setValue(field("text-policy-new-instruction"), "how much the TEXT promotes a competitor")
+      setValue(field("tpol-new-instruction"), "how much the TEXT promotes a competitor")
     );
-    await click(q('[data-testid="text-policy-new-submit"]'));
-    expect(q('[data-testid="text-policy-new-error"]').textContent).toBe(
-      "textPolicyError_duplicateId"
-    );
+    await click(q('[data-testid="tpol-new-submit"]'));
+    expect(q('[data-testid="tpol-new-error"]').textContent).toBe("textPolicyError_duplicateId");
 
-    await act(async () => setValue(field("text-policy-new-id"), "competitor-mentions"));
-    await act(async () => setValue(field("text-policy-new-terms"), "acme corp:5"));
-    await click(q('[data-testid="text-policy-new-submit"]'));
+    await act(async () => setValue(field("tpol-new-id"), "competitor-mentions"));
+    await act(async () => setValue(field("tpol-new-terms"), "acme corp:5"));
+    await click(q('[data-testid="tpol-new-submit"]'));
     expect(lastPatch(calls)?.textPolicies["competitor-mentions"]).toEqual({
       enabled: false,
       classifierInstruction: "how much the TEXT promotes a competitor",

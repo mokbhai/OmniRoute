@@ -80,7 +80,7 @@ export default function NewTextPolicyModal({
             variant="primary"
             icon="add"
             loading={saving}
-            data-testid="text-policy-new-submit"
+            data-testid="tpol-new-submit"
             onClick={() => void submit()}
           >
             {t("textPolicyCreate")}
@@ -88,7 +88,7 @@ export default function NewTextPolicyModal({
         </div>
       }
     >
-      <div className="space-y-4" data-testid="text-policy-new-modal">
+      <div className="space-y-4" data-testid="tpol-new-modal">
         <p className="text-sm text-text-muted">{t("textPolicyNewDesc")}</p>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Input
@@ -96,7 +96,7 @@ export default function NewTextPolicyModal({
             hint={t("textPolicyIdHint")}
             placeholder="competitor-mentions"
             value={form.id}
-            data-testid="text-policy-new-id"
+            data-testid="tpol-new-id"
             onChange={(event) => set({ id: event.target.value.toLowerCase() })}
           />
           <Input
@@ -112,7 +112,7 @@ export default function NewTextPolicyModal({
           hint={t("textPolicyInstructionHint")}
           placeholder={t("textPolicyNewInstructionPlaceholder")}
           value={form.instruction}
-          data-testid="text-policy-new-instruction"
+          data-testid="tpol-new-instruction"
           onChange={(event) => set({ instruction: event.target.value })}
         />
         <Input
@@ -128,11 +128,11 @@ export default function NewTextPolicyModal({
           hint={t("textPolicySeedTermsHint")}
           placeholder={"acme corp:5\nacme:3"}
           value={form.terms}
-          data-testid="text-policy-new-terms"
+          data-testid="tpol-new-terms"
           onChange={(event) => set({ terms: event.target.value })}
         />
         {error && (
-          <p role="alert" className="text-sm text-error" data-testid="text-policy-new-error">
+          <p role="alert" className="text-sm text-error" data-testid="tpol-new-error">
             {error}
           </p>
         )}

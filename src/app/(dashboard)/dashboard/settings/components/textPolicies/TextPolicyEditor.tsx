@@ -149,7 +149,7 @@ export default function TextPolicyEditor({
       subtitle={policy.description ?? t("textPolicyEditorDesc")}
       icon="tune"
     >
-      <div className="space-y-5" data-testid="text-policy-editor">
+      <div className="space-y-5" data-testid="tpol-editor">
         <Toggle
           checked={form.enabled}
           onChange={(checked) => set({ enabled: checked })}
@@ -171,7 +171,7 @@ export default function TextPolicyEditor({
             value={form.rerouteTarget}
             allowEmpty
             allowCustomInput
-            testId="text-policy-reroute-target"
+            testId="tpol-reroute-target"
             onChange={(value) => set({ rerouteTarget: value })}
           />
         </section>
@@ -187,7 +187,7 @@ export default function TextPolicyEditor({
               label={t("textPolicyLowThreshold")}
               hint={t("textPolicyLowThresholdHint")}
               value={form.lowThreshold}
-              data-testid="text-policy-low"
+              data-testid="tpol-low"
               onChange={(event) => set({ lowThreshold: event.target.value })}
             />
             <Input
@@ -197,7 +197,7 @@ export default function TextPolicyEditor({
               label={t("textPolicyHighThreshold")}
               hint={t("textPolicyHighThresholdHint")}
               value={form.highThreshold}
-              data-testid="text-policy-high"
+              data-testid="tpol-high"
               onChange={(event) => set({ highThreshold: event.target.value })}
             />
           </div>
@@ -210,7 +210,7 @@ export default function TextPolicyEditor({
             value={form.moderatorModel}
             allowEmpty
             allowCustomInput
-            testId="text-policy-moderator"
+            testId="tpol-moderator"
             onChange={(value) => set({ moderatorModel: value })}
           />
           <Input
@@ -290,7 +290,7 @@ export default function TextPolicyEditor({
               }
               placeholder={"onlyfans:3\nacme corp:5"}
               value={form.seedTerms}
-              data-testid="text-policy-seed-terms"
+              data-testid="tpol-seed-terms"
               onChange={(event) => set({ seedTerms: event.target.value })}
             />
             <Textarea
@@ -314,7 +314,7 @@ export default function TextPolicyEditor({
         </Collapsible>
 
         {error && (
-          <p role="alert" className="text-sm text-error" data-testid="text-policy-error">
+          <p role="alert" className="text-sm text-error" data-testid="tpol-error">
             {error}
           </p>
         )}
@@ -331,7 +331,7 @@ export default function TextPolicyEditor({
             variant="primary"
             icon="save"
             loading={saving}
-            data-testid="text-policy-save"
+            data-testid="tpol-save"
             onClick={() => void handleSave()}
           >
             {t("textPolicySave")}

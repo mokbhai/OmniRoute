@@ -36,7 +36,7 @@ export default function TextPolicyList({
         </Button>
       }
     >
-      <ul className="divide-y divide-border" data-testid="text-policy-list">
+      <ul className="divide-y divide-border" data-testid="tpol-list">
         {policies.map((policy) => {
           const selected = policy.id === selectedId;
           return (
@@ -51,7 +51,7 @@ export default function TextPolicyList({
                 type="button"
                 className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left"
                 aria-pressed={selected}
-                data-testid={`text-policy-row-${policy.id}`}
+                data-testid={`tpol-row-${policy.id}`}
                 onClick={() => onSelect(policy.id)}
               >
                 <span className="flex flex-wrap items-center gap-2">
