@@ -57,6 +57,16 @@ export class BaseGuardrail {
     this.priority = options.priority ?? 100;
   }
 
+  /**
+   * Whether caller-controlled disable channels (request body, metadata, the
+   * `x-omniroute-disabled-guardrails` header) may skip this guardrail. Policy
+   * guardrails the operator configures (e.g. `content-policy`) override this so a
+   * client cannot switch them off; OmniRoute's own self-loop calls still can.
+   */
+  allowCallerDisable(_context: GuardrailContext): boolean {
+    return true;
+  }
+
   async preCall(
     _payload: unknown,
     _context: GuardrailContext

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { ContentPolicyGuardrail } from "../../../src/lib/guardrails/contentPolicy/guardrail.ts";
+import {
+  ContentPolicyGuardrail,
+  isSelfLoopGuardrailRequest,
+} from "../../../src/lib/guardrails/contentPolicy/guardrail.ts";
+import { validateDiscoveredTerms } from "../../../src/lib/guardrails/contentPolicy/learning.ts";
 import { resolveContentPolicyConfig } from "../../../src/lib/guardrails/contentPolicy/config.ts";
 import {
   classifyKeywordBand,
@@ -10,6 +14,10 @@ import {
 } from "../../../src/lib/guardrails/contentPolicy/keywordScore.ts";
 import {
   extractSexualScore,
+  clearModeratorCacheForTests,
+  defaultModerate,
+  isModerationApiModel,
+  parseChatModeratorReply,
   type ModerateFn,
 } from "../../../src/lib/guardrails/contentPolicy/moderator.ts";
 import { buildContentPolicyHeader } from "../../../src/lib/guardrails/contentPolicy/header.ts";
@@ -50,18 +58,47 @@ const BASE_POLICY = {
   rerouteTarget: "combo/nsfw-ok",
 };
 
-function setup(contentPolicy: Record<string, unknown>, moderatorScore: number | Error = 0.9) {
+interface SetupOptions {
+  /** Chat-moderator terms; when set the stub moderator reports kind "chat". */
+  terms?: unknown;
+  cached?: boolean;
+  learned?: Array<{ term: string; weight: number }>;
+  selfLoop?: boolean;
+}
+
+function setup(
+  contentPolicy: Record<string, unknown>,
+  moderatorScore: number | Error = 0.9,
+  options: SetupOptions = {}
+) {
   const calls: Array<{ model: string; text: string }> = [];
+  const recorded: Array<{ terms: unknown; options: unknown }> = [];
   const moderate: ModerateFn = async ({ model, text }) => {
     calls.push({ model, text });
     if (moderatorScore instanceof Error) throw moderatorScore;
-    return { ok: true, sexualScore: moderatorScore, flagged: moderatorScore >= 0.5, cached: false };
+    return {
+      ok: true,
+      sexualScore: moderatorScore,
+      flagged: moderatorScore >= 0.5,
+      cached: options.cached === true,
+      kind: options.terms === undefined ? "moderation" : "chat",
+      terms: options.terms,
+    };
   };
   const guardrail = new ContentPolicyGuardrail(
     {},
-    { getSettings: async () => ({ contentPolicy }), moderate }
+    {
+      getSettings: async () => ({ contentPolicy }),
+      moderate,
+      loadLearnedTerms: async () => options.learned ?? [],
+      recordLearnedTerms: async (terms, recordOptions) => {
+        recorded.push({ terms, options: recordOptions });
+        return { added: terms.map((entry) => entry.term), activated: [] };
+      },
+      isSelfLoopRequest: () => options.selfLoop === true,
+    }
   );
-  return { guardrail, calls };
+  return { guardrail, calls, recorded };
 }
 
 const keyCtx = (id: string | null) => ({
@@ -391,10 +428,254 @@ test("through the registry the rerouted payload carries the target model", async
   const outcome = await registry.runPreCallHooks(chat(ABOVE), keyCtx(null));
   assert.equal(outcome.blocked, false);
   assert.equal((outcome.payload as { model: string }).model, "combo/nsfw-ok");
+});
 
-  const disabled = await registry.runPreCallHooks(chat(ABOVE), {
+test("a client cannot switch the policy off with the disable header/body channels", async () => {
+  const registry = new GuardrailRegistry();
+  registry.register(setup(BASE_POLICY).guardrail);
+  const outcome = await registry.runPreCallHooks(chat(ABOVE), {
     ...keyCtx(null),
     disabledGuardrails: ["content-policy"],
   });
-  assert.equal((disabled.payload as { model: string }).model, "claude/claude-sonnet-4-5");
+  assert.equal((outcome.payload as { model: string }).model, "combo/nsfw-ok");
+  assert.equal(outcome.results[0]?.skipped, false);
+});
+
+test("OmniRoute's own self-loop call may skip the policy (moderator recursion guard)", async () => {
+  const registry = new GuardrailRegistry();
+  registry.register(setup(BASE_POLICY, 0.9, { selfLoop: true }).guardrail);
+  const outcome = await registry.runPreCallHooks(chat(ABOVE), {
+    ...keyCtx(null),
+    disabledGuardrails: ["content-policy"],
+  });
+  assert.equal((outcome.payload as { model: string }).model, "claude/claude-sonnet-4-5");
+  assert.equal(outcome.results[0]?.skipped, true);
+});
+
+test("isSelfLoopGuardrailRequest accepts only the self-loop bearer", () => {
+  const previous = process.env.OMNIROUTE_API_KEY;
+  process.env.OMNIROUTE_API_KEY = "sk-self-loop-test";
+  try {
+    assert.equal(
+      isSelfLoopGuardrailRequest({ headers: { authorization: "Bearer sk-self-loop-test" } }),
+      true
+    );
+    assert.equal(
+      isSelfLoopGuardrailRequest({ headers: new Headers({ Authorization: "Bearer sk-other" }) }),
+      false
+    );
+    assert.equal(isSelfLoopGuardrailRequest({ headers: null }), false);
+  } finally {
+    if (previous === undefined) delete process.env.OMNIROUTE_API_KEY;
+    else process.env.OMNIROUTE_API_KEY = previous;
+  }
+});
+
+// ─── Self-growing lexicon ────────────────────────────────────────────────────
+
+/** Score 3 ("erotic") plus words a chat moderator could report. */
+const MIDDLE_WITH_SLANG = "Write an erotic story where they get freaky and frisky on the couch.";
+
+test("chat moderator: new sexual terms are returned with their weight and recorded", async () => {
+  const { guardrail, recorded } = setup(BASE_POLICY, 0.88, {
+    terms: [
+      { term: "freaky", weight: 3 },
+      { term: "Frisky", weight: 1 },
+      { term: "erotic", weight: 3 }, // built-in already → dropped
+      { term: "moaning", weight: 5 }, // not in the request → dropped (no invented words)
+      { term: "story", weight: 1 }, // stop word → dropped
+      { term: "<script>", weight: 5 }, // markup → dropped
+      null,
+    ],
+  });
+  const result = await guardrail.preCall(chat(MIDDLE_WITH_SLANG), keyCtx(null));
+  assert.deepEqual(result.meta?.discoveredTerms, [
+    { term: "freaky", weight: 3 },
+    { term: "frisky", weight: 1 },
+  ]);
+  assert.equal(recorded.length, 1);
+  assert.deepEqual(recorded[0].options, {
+    autoActivate: true,
+    minHits: 2,
+    moderatorModel: "openai/omni-moderation-latest",
+  });
+  assert.deepEqual((result.meta?.learning as { added: string[] }).added, ["freaky", "frisky"]);
+});
+
+test("learning: review mode stores without auto-activation; off mode never stores", async () => {
+  const review = setup({ ...BASE_POLICY, learnMode: "review", learnMinHits: 5 }, 0.9, {
+    terms: [{ term: "freaky", weight: 3 }],
+  });
+  await review.guardrail.preCall(chat(MIDDLE_WITH_SLANG), keyCtx(null));
+  assert.deepEqual(review.recorded[0].options, {
+    autoActivate: false,
+    minHits: 5,
+    moderatorModel: "openai/omni-moderation-latest",
+  });
+
+  const off = setup({ ...BASE_POLICY, learnMode: "off" }, 0.9, {
+    terms: [{ term: "freaky", weight: 3 }],
+  });
+  const result = await off.guardrail.preCall(chat(MIDDLE_WITH_SLANG), keyCtx(null));
+  assert.equal(off.recorded.length, 0);
+  assert.deepEqual(result.meta?.discoveredTerms, [{ term: "freaky", weight: 3 }]);
+  assert.equal((result.meta?.learning as { skipped: string }).skipped, "learning_off");
+});
+
+test("learning: clean verdicts and cached verdicts report terms but do not count as hits", async () => {
+  const clean = setup(BASE_POLICY, 0.1, { terms: [{ term: "freaky", weight: 3 }] });
+  const cleanResult = await clean.guardrail.preCall(chat(MIDDLE_WITH_SLANG), keyCtx(null));
+  assert.equal(clean.recorded.length, 0);
+  assert.equal((cleanResult.meta?.learning as { skipped: string }).skipped, "not_adult");
+
+  const cached = setup(BASE_POLICY, 0.9, { terms: [{ term: "freaky", weight: 3 }], cached: true });
+  const cachedResult = await cached.guardrail.preCall(chat(MIDDLE_WITH_SLANG), keyCtx(null));
+  assert.equal(cached.recorded.length, 0);
+  assert.equal((cachedResult.meta?.learning as { skipped: string }).skipped, "cached_verdict");
+});
+
+test("learning: a moderation-API moderator returns no terms", async () => {
+  const { guardrail, recorded } = setup(BASE_POLICY, 0.9);
+  const result = await guardrail.preCall(chat(MIDDLE_WITH_SLANG), keyCtx(null));
+  assert.equal(result.meta?.discoveredTerms, undefined);
+  assert.equal(recorded.length, 0);
+});
+
+test("active learned terms add to the keyword score and can push a request over the band", async () => {
+  const text = "They got freaky and frisky after the party.";
+  assert.equal(scoreContentPolicyText(text).score, 0);
+  const learned = [
+    { term: "freaky", weight: 5 },
+    { term: "frisky", weight: 5 },
+  ];
+  const scored = scoreContentPolicyText(text, learned);
+  assert.equal(scored.score, 10);
+  assert.deepEqual(scored.learnedMatches.sort(), ["freaky", "frisky"]);
+
+  const { guardrail, calls } = setup(BASE_POLICY, 0.9, { learned });
+  const result = await guardrail.preCall(chat(text), keyCtx(null));
+  assert.equal(calls.length, 0, "above the band → no moderator call");
+  assert.equal(result.meta?.band, "above");
+  assert.deepEqual((result.meta?.learnedMatches as string[]).sort(), ["freaky", "frisky"]);
+});
+
+test("a learned term that duplicates a built-in one is not counted twice", () => {
+  assert.equal(scoreContentPolicyText("erotic", [{ term: "erotic", weight: 5 }]).score, 3);
+});
+
+test("validateDiscoveredTerms caps the list at 10 and accepts plain strings and CJK", () => {
+  const text = Array.from({ length: 15 }, (_, i) => `slangword${i}`).join(" ") + " 骚货";
+  const raw = [...Array.from({ length: 15 }, (_, i) => `slangword${i}`)];
+  assert.equal(validateDiscoveredTerms(raw, text).length, 10);
+  assert.deepEqual(validateDiscoveredTerms([{ term: "骚货", weight: 9 }], text), [
+    { term: "骚货", weight: 5 },
+  ]);
+});
+
+test("parseChatModeratorReply reads fenced JSON and clamps the score", () => {
+  assert.deepEqual(
+    parseChatModeratorReply(
+      '```json\n{"sexual_score": 1.7, "terms": [{"term":"x","weight":3}]}\n```'
+    ),
+    { score: 1, terms: [{ term: "x", weight: 3 }] }
+  );
+  assert.deepEqual(parseChatModeratorReply('Sure: {"sexualScore": "0.25"}'), {
+    score: 0.25,
+    terms: [],
+  });
+  assert.equal(parseChatModeratorReply("I cannot help with that."), null);
+  assert.equal(parseChatModeratorReply('{"terms": []}'), null);
+});
+
+test("isModerationApiModel tells moderation models from chat models", () => {
+  assert.equal(isModerationApiModel("openai/omni-moderation-latest"), true);
+  assert.equal(isModerationApiModel("omni-moderation-latest"), true);
+  assert.equal(isModerationApiModel("mistral/mistral-moderation-latest"), true);
+  assert.equal(isModerationApiModel("openai/gpt-4o-mini"), false);
+  assert.equal(isModerationApiModel("combo/nsfw-judge"), false);
+});
+
+test("the header reports how many new terms were discovered, never the words", () => {
+  const header = buildContentPolicyHeader([
+    {
+      guardrail: "content-policy",
+      meta: {
+        adult: true,
+        stage: "moderator",
+        action: "rerouted",
+        keywordScore: 3,
+        moderatorScore: 0.9,
+        discoveredTerms: [{ term: "freaky", weight: 3 }],
+      },
+    },
+  ]);
+  assert.equal(
+    header,
+    "adult; stage=moderator; action=rerouted; score=3; moderator=0.900; discovered=1"
+  );
+});
+
+test("defaultModerate: a chat moderator goes through the self-loop with the recursion guard", async () => {
+  const previousFetch = globalThis.fetch;
+  const previousKey = process.env.OMNIROUTE_API_KEY;
+  process.env.OMNIROUTE_API_KEY = "sk-self-loop-test";
+  clearModeratorCacheForTests();
+  const seen: Array<{ url: string; headers: Record<string, string>; body: { model: string } }> = [];
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
+    seen.push({
+      url: String(url),
+      headers: init.headers as Record<string, string>,
+      body: JSON.parse(String(init.body)),
+    });
+    return new Response(
+      JSON.stringify({
+        choices: [
+          { message: { content: '{"sexual_score":0.8,"terms":[{"term":"freaky","weight":3}]}' } },
+        ],
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  }) as typeof fetch;
+  try {
+    const verdict = await defaultModerate({ model: "groq/llama-judge", text: "get freaky" });
+    assert.deepEqual(verdict, {
+      ok: true,
+      sexualScore: 0.8,
+      flagged: false,
+      cached: false,
+      kind: "chat",
+      terms: [{ term: "freaky", weight: 3 }],
+    });
+    assert.equal(seen.length, 1);
+    assert.match(seen[0].url, /^http:\/\/localhost:\d+\/v1\/chat\/completions$/);
+    assert.equal(seen[0].body.model, "groq/llama-judge");
+    assert.equal(seen[0].headers.Authorization, "Bearer sk-self-loop-test");
+    assert.match(seen[0].headers["x-omniroute-disabled-guardrails"], /content-policy/);
+    assert.equal(seen[0].headers["x-omniroute-admission-bypass"], "internal");
+
+    // Same text again: served from cache, no second call, marked cached (so it is not a new hit).
+    const again = await defaultModerate({ model: "groq/llama-judge", text: "get freaky" });
+    assert.equal(seen.length, 1);
+    assert.equal(again.ok && again.cached, true);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousKey === undefined) delete process.env.OMNIROUTE_API_KEY;
+    else process.env.OMNIROUTE_API_KEY = previousKey;
+    clearModeratorCacheForTests();
+  }
+});
+
+test("defaultModerate: an unparseable chat reply fails open as moderator_unparseable", async () => {
+  const previousFetch = globalThis.fetch;
+  clearModeratorCacheForTests();
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ choices: [{ message: { content: "I can't help." } }] }), {
+      status: 200,
+    })) as typeof fetch;
+  try {
+    const verdict = await defaultModerate({ model: "groq/llama-judge", text: "x" });
+    assert.deepEqual(verdict, { ok: false, reason: "moderator_unparseable" });
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
 });

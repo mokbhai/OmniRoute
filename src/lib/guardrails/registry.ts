@@ -140,6 +140,7 @@ export class GuardrailRegistry {
   }
 
   private isDisabled(guardrail: BaseGuardrail, context: GuardrailContext) {
+    if (!guardrail.allowCallerDisable(context)) return false;
     const disabled = new Set(
       (context.disabledGuardrails || []).map((entry) => normalizeGuardrailName(entry))
     );

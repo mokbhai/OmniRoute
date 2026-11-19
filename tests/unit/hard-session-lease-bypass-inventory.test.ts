@@ -115,6 +115,11 @@ const EXPECTED: Record<InventoryKind, Record<string, number>> = {
     // Fal inference uses the scoped quota-preflight resolver; existing-job reads
     // cannot dispatch. Ownership, connection limits and later-message budgets are route-tested.
     "src/lib/fal/runtime.ts": 1,
+    // Content-policy guardrail: the middle-band moderator resolves the operator's
+    // moderation-provider connection (OpenAI/Mistral /v1/moderations) for a score-only
+    // classification call. It never dispatches the caller's chat; the request itself
+    // still goes through the class-A path in chat.ts (class B).
+    "src/lib/guardrails/contentPolicy/moderator.ts": 1,
     "src/lib/images/adobeFireflyEdit.ts": 1,
     // PR #11390: second site is the generic derived-provider listing fallback —
     // read-only key presence probe used to decide whether a configured chat

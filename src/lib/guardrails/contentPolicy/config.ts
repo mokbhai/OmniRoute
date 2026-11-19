@@ -16,12 +16,15 @@
  *     "moderatorModel": "openai/omni-moderation-latest",
  *     "moderationScoreThreshold": 0.5,
  *     "rerouteTarget": "combo/nsfw-ok",
+ *     "learnMode": "auto",
+ *     "learnMinHits": 2,
  *     "keyOverrides": { "<apiKeyId>": { "enabled": true, "rerouteTarget": "grok/grok-4" } }
  *   }
  */
 
 import {
   contentPolicyOverrideSchema,
+  type ContentPolicyLearnMode,
   type ContentPolicyMode,
   type ContentPolicyOverride,
 } from "@/shared/validation/contentPolicySchema";
@@ -34,6 +37,8 @@ export interface ContentPolicyConfig {
   moderatorModel: string | null;
   moderationScoreThreshold: number;
   rerouteTarget: string | null;
+  learnMode: ContentPolicyLearnMode;
+  learnMinHits: number;
 }
 
 export const DEFAULT_CONTENT_POLICY_CONFIG: Readonly<ContentPolicyConfig> = Object.freeze({
@@ -44,6 +49,8 @@ export const DEFAULT_CONTENT_POLICY_CONFIG: Readonly<ContentPolicyConfig> = Obje
   moderatorModel: null,
   moderationScoreThreshold: 0.5,
   rerouteTarget: null,
+  learnMode: "auto",
+  learnMinHits: 2,
 });
 
 export interface ResolvedContentPolicyConfig {
@@ -102,6 +109,8 @@ function applyLayer(
   if (layer.highThreshold !== undefined) set("highThreshold", layer.highThreshold);
   if (layer.moderationScoreThreshold !== undefined)
     set("moderationScoreThreshold", layer.moderationScoreThreshold);
+  if (layer.learnMode !== undefined) set("learnMode", layer.learnMode);
+  if (layer.learnMinHits !== undefined) set("learnMinHits", layer.learnMinHits);
   const moderatorModel = emptyToNull(layer.moderatorModel);
   if (moderatorModel !== undefined) set("moderatorModel", moderatorModel);
   const rerouteTarget = emptyToNull(layer.rerouteTarget);

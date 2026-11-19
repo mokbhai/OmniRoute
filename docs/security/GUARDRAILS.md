@@ -954,8 +954,10 @@ choice is the final one.
    (images and audio are skipped; text over 32 000 characters keeps its head and
    tail halves). Weights: `5` explicit acts / porn terms, `3` strong signals
    (nudity, sex positions, fetish), `1` weak signals that are common in ordinary
-   text (`sexy`, `penetration`). The lexicon covers English, Portuguese, Spanish,
-   Chinese (simplified and traditional) and some Japanese.
+   text (`sexy`, `penetration`). The built-in lexicon covers English, Portuguese,
+   Spanish, Chinese (simplified and traditional) and some Japanese. Active
+   **learned** terms (see [Self-growing lexicon](#self-growing-lexicon)) are
+   scored the same way.
 2. **Moderator**, only for the middle band. The score is placed in a band:
 
    | Keyword score                           | Band     | Moderator called? | Outcome               |
@@ -964,15 +966,80 @@ choice is the final one.
    | `>= lowThreshold` and `< highThreshold` | `middle` | **yes**           | moderator decides     |
    | `>= highThreshold`                      | `above`  | no                | adult, action applies |
 
-   The moderator call goes through the same code as `POST /v1/moderations`
-   (`handleModeration()` plus the provider's configured connection), so
-   `moderatorModel` must be a moderation model OmniRoute already has
-   credentials for: `openai/omni-moderation-latest`,
-   `openai/text-moderation-latest`, or `mistral/mistral-moderation-latest`. The
-   request is adult when the highest `sexual*` category score is
-   `>= moderationScoreThreshold`. Verdicts are cached for 10 minutes by a hash of
-   (model, text). If the moderator is missing or fails, the request **fails
-   open** and `meta.moderatorError` records why.
+   `moderatorModel` picks one of two moderator kinds
+   (`isModerationApiModel()` in `contentPolicy/moderator.ts`):
+
+   - **Moderation model** (`openai/omni-moderation-latest`,
+     `openai/text-moderation-latest`, `mistral/mistral-moderation-latest`): goes
+     through the same code as `POST /v1/moderations` with the provider's
+     configured connection. It returns a score only. The score is the highest
+     `sexual*` category score.
+   - **Chat model** (any other configured model or combo): called through
+     OmniRoute's own `/v1/chat/completions` (self-loop bearer, admission bypass,
+     `x-omniroute-disabled-guardrails: content-policy,prompt-injection` as the
+     recursion guard) with a classification prompt. It must reply with JSON
+     `{"sexual_score": 0..1, "terms": [{"term": "...", "weight": 1|3|5}]}`. This
+     kind also reports the sexual words it found, which feeds the self-growing
+     lexicon. Pick a model that is willing to read adult text.
+
+   The request is adult when the score is `>= moderationScoreThreshold`.
+   Verdicts are cached for 10 minutes by a hash of (model, text). If the
+   moderator is missing, fails, or replies with something that is not the JSON
+   verdict, the request **fails open** and `meta.moderatorError` records why
+   (`no_moderator_model`, `no_credentials`, `moderator_http_error`,
+   `moderator_unparseable`, `moderator_error`).
+
+<a id="self-growing-lexicon"></a>
+
+**Self-growing lexicon.** When a chat-model moderator handles a middle-band
+request, the sexual terms it reports come back in `meta.discoveredTerms` as
+`[{ "term": "...", "weight": 1 | 3 | 5 }]`, and can be learned. A reported term
+is kept only if it:
+
+- normalizes (NFKC, lowercase, single spaces) to 2–48 characters and at most 4
+  words, with at least one letter;
+- contains only letters, digits, spaces, `-` and `'`;
+- **appears in the request text**, so the moderator cannot invent words and a
+  request cannot make it "learn" text that is not there;
+- is not already built in and not a common stop word.
+
+At most 10 terms are kept per verdict. Learned terms live in the
+`content_policy_terms` table (`src/lib/db/contentPolicyTerms.ts`):
+
+| Status     | Scored? | Meaning                                                     |
+| ---------- | ------- | ----------------------------------------------------------- |
+| `pending`  | no      | Reported, waiting for more hits or for an operator.         |
+| `active`   | yes     | Added to the keyword score with its weight.                 |
+| `rejected` | no      | Turned down by an operator. Learning never re-activates it. |
+
+Each **fresh adult verdict** that reports a term adds one hit. A clean verdict,
+or a verdict served from the cache, reports terms but adds no hit. The weight is
+the highest reported so far; a manually added term keeps its operator weight.
+`learnMode` decides what happens:
+
+- `auto` (default): stored, and active once its hits reach `learnMinHits`
+  (default `2`).
+- `review`: stored as `pending`; an operator activates it.
+- `off`: reported in `meta.discoveredTerms` only, never stored.
+
+`meta.learning` says what happened (`added`, `activated`, or `skipped` with
+`no_new_terms`, `learning_off`, `not_adult`, `cached_verdict`, `store_error`).
+Active terms are read through a 30 s cache. Moderation-model moderators report no
+terms, so the lexicon only grows with a chat-model moderator.
+
+Manage the learned terms with `/api/content-policy/terms` (management auth):
+
+- `GET /api/content-policy/terms[?status=pending|active|rejected]`: list terms
+  with hits, weight, source and timestamps.
+- `PUT /api/content-policy/terms` `{ "term", "weight"?, "status"? }`: add a term
+  by hand (default `active`, weight `3`), or activate, reject or reweight one.
+- `DELETE /api/content-policy/terms` `{ "term" }`: remove a term. Learning may
+  add it again; set `status: "rejected"` to keep it out.
+
+Risk: in `auto` mode a client that keeps sending adult requests containing an
+ordinary word could get that word learned, which then raises the score of other
+requests containing it. `learnMinHits`, the request-text check and the stop list
+limit this. Use `review` mode if you want every new term approved first.
 
 **Action for an adult request (`mode`).**
 
@@ -997,6 +1064,8 @@ choice is the final one.
     "moderatorModel": "openai/omni-moderation-latest",
     "moderationScoreThreshold": 0.5,
     "rerouteTarget": "combo/nsfw-ok",
+    "learnMode": "auto",
+    "learnMinHits": 2,
     "keyOverrides": {
       "<apiKeyId>": { "enabled": true, "rerouteTarget": "grok/grok-4" }
     }
@@ -1005,7 +1074,8 @@ choice is the final one.
 ```
 
 Defaults: `enabled: false`, `mode: "reroute"`, `lowThreshold: 3`,
-`highThreshold: 10`, `moderationScoreThreshold: 0.5`, no moderator, no target.
+`highThreshold: 10`, `moderationScoreThreshold: 0.5`, `learnMode: "auto"`,
+`learnMinHits: 2`, no moderator, no target.
 `lowThreshold` must be lower than `highThreshold` (Zod:
 `src/shared/validation/contentPolicySchema.ts`).
 
@@ -1015,16 +1085,24 @@ value → global value → default. A field missing from the key's entry inherit
 the global value (the same "inherit" rule as the API key `codexServiceMode`). So
 a key can turn the policy on while it is off globally, turn it off while it is
 on globally, or use its own target, moderator or band. `meta.scope` is `"key"`
-when the caller's key has an override entry. The guardrail can also be skipped
-per request like any other (`x-omniroute-disabled-guardrails: content-policy`).
+when the caller's key has an override entry.
+
+**Clients cannot switch it off.** Unlike other registry guardrails, the
+caller-controlled disable channels (`x-omniroute-disabled-guardrails`,
+`disabledGuardrails` in the body or metadata) do **not** skip `content-policy`.
+It overrides `BaseGuardrail.allowCallerDisable()` and honors a disable only on
+OmniRoute's own self-loop calls (bearer equal to the self-loop secret, compared
+in constant time); the chat moderator relies on this to avoid moderating itself.
+To exempt a key, set `keyOverrides[<keyId>].enabled = false`.
 
 **Transparency.** The decision is returned in the guardrail result `meta`
-(`adult`, `stage`, `band`, `keywordScore`, `matchedTerms`, `moderatorModel`,
-`moderatorScore`, `scope`, `action`, `fromModel`, `toModel`) and on the response
-as `x-omniroute-content-policy`, for example
-`adult; stage=moderator; action=rerouted; score=3; moderator=0.910`. Logs carry
-scores and the action, never request text. `matchedTerms` lists lexicon
-entries only.
+(`adult`, `stage`, `band`, `keywordScore`, `matchedTerms`, `learnedMatches`,
+`moderatorModel`, `moderatorScore`, `discoveredTerms`, `learning`, `scope`,
+`action`, `fromModel`, `toModel`) and on the response as
+`x-omniroute-content-policy`, for example
+`adult; stage=moderator; action=rerouted; score=3; moderator=0.910; discovered=2`.
+The header carries only a count of discovered terms, never the words. Logs carry
+scores and the action, never request text.
 
 **Limits.** Requests only: the check runs before the upstream call, so a response
 that turns explicit is not caught. If the vision bridge already rerouted an image
@@ -1032,7 +1110,8 @@ request to a vision model and the content policy then reroutes it, the content
 policy target wins; pick a vision-capable target if your adult traffic carries
 images.
 
-Regression guard: `tests/unit/guardrails/contentPolicy.test.ts`.
+Regression guards: `tests/unit/guardrails/contentPolicy.test.ts` and
+`tests/unit/content-policy-terms.test.ts`.
 
 ## Base Contract (`base.ts`)
 

@@ -195,11 +195,39 @@ export interface KeywordScoreResult {
   score: number;
   /** Matched lexicon terms (lexicon entries, never request text), highest weight first. */
   matchedTerms: string[];
+  /** The subset of `matchedTerms` that came from the learned lexicon. */
+  learnedMatches: string[];
 }
 
-/** Score already-extracted request text. */
-export function scoreContentPolicyText(text: string): KeywordScoreResult {
-  if (!text) return { score: 0, matchedTerms: [] };
+/** Normalized form of every built-in term, so learned duplicates are skipped. */
+export const BUILT_IN_TERM_KEYS: ReadonlySet<string> = new Set(
+  CONTENT_POLICY_LEXICON.map(({ term }) => term.normalize("NFKC").toLowerCase().replace(/\*$/, ""))
+);
+
+const LEARNED_COMPILE_CACHE_MAX = 5_000;
+const learnedCompileCache = new Map<string, CompiledTerm>();
+
+function compileLearned(entry: KeywordTerm): CompiledTerm {
+  // Learned terms are literals: a trailing `*` is not a prefix marker here.
+  const literal = entry.term.replace(/\*+$/, "");
+  const key = `${literal}\u0000${entry.weight}`;
+  const cached = learnedCompileCache.get(key);
+  if (cached) return cached;
+  if (learnedCompileCache.size >= LEARNED_COMPILE_CACHE_MAX) learnedCompileCache.clear();
+  const compiled = compileTerm({ term: literal, weight: entry.weight });
+  learnedCompileCache.set(key, compiled);
+  return compiled;
+}
+
+/**
+ * Score already-extracted request text against the built-in lexicon plus any
+ * learned terms (`content_policy_terms` rows with status `active`).
+ */
+export function scoreContentPolicyText(
+  text: string,
+  learnedTerms: readonly KeywordTerm[] = []
+): KeywordScoreResult {
+  if (!text) return { score: 0, matchedTerms: [], learnedMatches: [] };
   const haystack = text.normalize("NFKC").toLowerCase();
   let score = 0;
   const matched: CompiledTerm[] = [];
@@ -209,8 +237,18 @@ export function scoreContentPolicyText(text: string): KeywordScoreResult {
       matched.push(entry);
     }
   }
+  const learnedMatches: string[] = [];
+  for (const learned of learnedTerms) {
+    if (!learned?.term || BUILT_IN_TERM_KEYS.has(learned.term)) continue;
+    const entry = compileLearned(learned);
+    if (entry.test(haystack)) {
+      score += entry.weight;
+      matched.push(entry);
+      learnedMatches.push(entry.term);
+    }
+  }
   matched.sort((left, right) => right.weight - left.weight);
-  return { score, matchedTerms: matched.map((entry) => entry.term) };
+  return { score, matchedTerms: matched.map((entry) => entry.term), learnedMatches };
 }
 
 export type KeywordBand = "below" | "middle" | "above";

@@ -22,6 +22,8 @@
  */
 
 import { getCachedSettings as defaultGetSettings } from "@/lib/db/readCache";
+import { resolveSelfLoopBearer } from "@/shared/middleware/chatAdmissionIdentity";
+import { timingSafeCompare } from "@/shared/utils/timingSafeCompare";
 
 import { BaseGuardrail, type GuardrailContext, type GuardrailResult } from "../base";
 import { resolveContentPolicyConfig } from "./config";
@@ -31,7 +33,14 @@ import {
   extractContentPolicyText,
   scoreContentPolicyText,
   type KeywordBand,
+  type KeywordTerm,
 } from "./keywordScore";
+import {
+  loadActiveLearnedTerms,
+  recordLearnedTerms,
+  validateDiscoveredTerms,
+  type DiscoveredTerm,
+} from "./learning";
 import {
   clipModeratorInput,
   defaultModerate,
@@ -61,6 +70,15 @@ export interface ContentPolicyDecision {
   moderatorCached?: boolean;
   /** Set when the moderator could not decide; the request then fails open. */
   moderatorError?: string;
+  /** Learned lexicon terms that matched (subset of `matchedTerms`). */
+  learnedMatches?: string[];
+  /**
+   * Chat moderator only: sexual terms it found in the request that are not in the
+   * built-in lexicon, each with its weight (1 weak, 3 strong, 5 explicit).
+   */
+  discoveredTerms?: DiscoveredTerm[];
+  /** What the self-growing lexicon did with `discoveredTerms`. */
+  learning?: { mode: string; added: string[]; activated: string[]; skipped?: string };
   fromModel?: string;
   toModel?: string;
 }
@@ -68,6 +86,28 @@ export interface ContentPolicyDecision {
 export interface ContentPolicyDependencies {
   getSettings?: () => Promise<Record<string, unknown>>;
   moderate?: ModerateFn;
+  loadLearnedTerms?: () => Promise<KeywordTerm[]>;
+  recordLearnedTerms?: typeof recordLearnedTerms;
+  /** True when the request is OmniRoute's own self-loop call (may skip this guardrail). */
+  isSelfLoopRequest?: (context: GuardrailContext) => boolean;
+}
+
+function headerValue(headers: GuardrailContext["headers"], name: string): string | null {
+  if (!headers) return null;
+  if (typeof (headers as Headers).get === "function") return (headers as Headers).get(name);
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === name && typeof value === "string") return value;
+  }
+  return null;
+}
+
+/** The request authenticated with the self-loop bearer (constant-time compare). */
+export function isSelfLoopGuardrailRequest(context: GuardrailContext): boolean {
+  const match = /^bearer\s+(\S+)$/i.exec(
+    headerValue(context.headers, "authorization")?.trim() ?? ""
+  );
+  if (!match) return false;
+  return timingSafeCompare(match[1].trim().toLowerCase(), resolveSelfLoopBearer().toLowerCase());
 }
 
 const BLOCK_MESSAGE = "Request rejected by content policy";
@@ -86,6 +126,15 @@ export class ContentPolicyGuardrail extends BaseGuardrail {
     this.deps = deps;
   }
 
+  /**
+   * Operator policy: a client cannot switch it off with the disable header/body
+   * channels. Only OmniRoute's own self-loop calls (the chat moderator, bridges) can.
+   * Per-key opt-out is `contentPolicy.keyOverrides[<keyId>].enabled = false`.
+   */
+  allowCallerDisable(context: GuardrailContext): boolean {
+    return (this.deps.isSelfLoopRequest ?? isSelfLoopGuardrailRequest)(context);
+  }
+
   async preCall(payload: unknown, context: GuardrailContext): Promise<GuardrailResult<unknown>> {
     if (!payload || typeof payload !== "object") return { block: false };
 
@@ -101,7 +150,13 @@ export class ContentPolicyGuardrail extends BaseGuardrail {
     if (!config.enabled) return { block: false };
 
     const text = extractContentPolicyText(payload);
-    const { score, matchedTerms } = scoreContentPolicyText(text);
+    let learnedTerms: KeywordTerm[] = [];
+    try {
+      learnedTerms = await (this.deps.loadLearnedTerms ?? loadActiveLearnedTerms)();
+    } catch {
+      learnedTerms = [];
+    }
+    const { score, matchedTerms, learnedMatches } = scoreContentPolicyText(text, learnedTerms);
     const band = classifyKeywordBand(score, config.lowThreshold, config.highThreshold);
     const decision: ContentPolicyDecision = {
       adult: band === "above",
@@ -114,6 +169,7 @@ export class ContentPolicyGuardrail extends BaseGuardrail {
       scope,
       action: "allowed",
     };
+    if (learnedMatches.length > 0) decision.learnedMatches = learnedMatches.slice(0, 10);
 
     if (band === "middle") {
       decision.stage = "moderator";
@@ -136,6 +192,10 @@ export class ContentPolicyGuardrail extends BaseGuardrail {
           decision.moderatorScore = verdict.sexualScore;
           decision.moderatorCached = verdict.cached;
           decision.adult = verdict.sexualScore >= config.moderationScoreThreshold;
+          if (verdict.kind === "chat") {
+            decision.discoveredTerms = validateDiscoveredTerms(verdict.terms, text);
+            await this.learn(decision, config, verdict.cached, context);
+          }
         } else {
           decision.moderatorError = verdict.reason;
         }
@@ -200,6 +260,45 @@ export class ContentPolicyGuardrail extends BaseGuardrail {
       modifiedPayload: { ...(payload as Record<string, unknown>), model: config.rerouteTarget },
       meta: { ...decision },
     };
+  }
+
+  /**
+   * Self-growing lexicon. Only adult verdicts teach, only fresh (uncached) verdicts
+   * count as a hit, and "off" reports terms without storing them.
+   */
+  private async learn(
+    decision: ContentPolicyDecision,
+    config: { learnMode: string; learnMinHits: number; moderatorModel: string | null },
+    cached: boolean,
+    context: GuardrailContext
+  ): Promise<void> {
+    const terms = decision.discoveredTerms ?? [];
+    const learning: NonNullable<ContentPolicyDecision["learning"]> = {
+      mode: config.learnMode,
+      added: [],
+      activated: [],
+    };
+    decision.learning = learning;
+    if (terms.length === 0) return void (learning.skipped = "no_new_terms");
+    if (config.learnMode === "off") return void (learning.skipped = "learning_off");
+    if (!decision.adult) return void (learning.skipped = "not_adult");
+    if (cached) return void (learning.skipped = "cached_verdict");
+    try {
+      const result = await (this.deps.recordLearnedTerms ?? recordLearnedTerms)(terms, {
+        autoActivate: config.learnMode === "auto",
+        minHits: config.learnMinHits,
+        moderatorModel: config.moderatorModel,
+      });
+      learning.added = result.added;
+      learning.activated = result.activated;
+      if (result.activated.length > 0) {
+        context.log?.info?.("CONTENT_POLICY", "Learned lexicon terms activated", {
+          count: result.activated.length,
+        });
+      }
+    } catch {
+      learning.skipped = "store_error";
+    }
   }
 }
 

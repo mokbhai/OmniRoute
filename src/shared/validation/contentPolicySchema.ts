@@ -12,6 +12,16 @@ import { z } from "zod";
 export const CONTENT_POLICY_MODES = ["reroute", "block", "flag"] as const;
 export type ContentPolicyMode = (typeof CONTENT_POLICY_MODES)[number];
 
+/**
+ * What happens to new sexual terms a chat-model moderator reports:
+ * - "auto":   stored, and promoted to the active lexicon once reported in `learnMinHits`
+ *             adult verdicts.
+ * - "review": stored as pending; an operator activates them (`/api/content-policy/terms`).
+ * - "off":    reported in the decision only, never stored.
+ */
+export const CONTENT_POLICY_LEARN_MODES = ["auto", "review", "off"] as const;
+export type ContentPolicyLearnMode = (typeof CONTENT_POLICY_LEARN_MODES)[number];
+
 export const contentPolicyOverrideSchema = z
   .object({
     enabled: z.boolean().optional(),
@@ -20,12 +30,21 @@ export const contentPolicyOverrideSchema = z
     lowThreshold: z.number().min(0).max(1000).optional(),
     /** Keyword score at or above this is treated as adult without calling the moderator. */
     highThreshold: z.number().min(0).max(1000).optional(),
-    /** Moderation model, e.g. `openai/omni-moderation-latest` or `mistral/mistral-moderation-latest`. */
+    /**
+     * Moderator. A moderation model (`openai/omni-moderation-latest`,
+     * `mistral/mistral-moderation-latest`) returns a score only. Any other configured
+     * model or combo is called as a chat model and also reports the sexual terms it
+     * found, which feed the self-growing lexicon.
+     */
     moderatorModel: z.string().trim().max(200).optional(),
     /** Moderator `sexual` category score at or above this counts as adult (0..1). */
     moderationScoreThreshold: z.number().min(0).max(1).optional(),
     /** Model or combo the request is sent to instead when it is judged adult (mode `reroute`). */
     rerouteTarget: z.string().trim().max(200).optional(),
+    /** Self-growing lexicon: how new terms reported by a chat-model moderator are handled. */
+    learnMode: z.enum(CONTENT_POLICY_LEARN_MODES).optional(),
+    /** In `auto` learn mode, adult verdicts a term must appear in before it becomes active. */
+    learnMinHits: z.number().int().min(1).max(100).optional(),
   })
   .strict();
 

@@ -3,7 +3,7 @@ export const CONTENT_POLICY_GUARDRAIL_NAME = "content-policy";
 /**
  * Value of the `x-omniroute-content-policy` response header, built from the
  * guardrail's meta. Null when the guardrail did not run or the policy is off.
- * Format: `<adult|clean>; stage=<keyword|moderator>; action=<action>; score=<n>[; moderator=<0..1>]`
+ * Format: `<adult|clean>; stage=<keyword|moderator>; action=<action>; score=<n>[; moderator=<0..1>][; discovered=<n>]`
  */
 export function buildContentPolicyHeader(
   results: Array<{ guardrail: string; meta?: Record<string, unknown> | null }>
@@ -20,5 +20,9 @@ export function buildContentPolicyHeader(
     parts.push(`moderator=${meta.moderatorScore.toFixed(3)}`);
   }
   if (typeof meta.moderatorError === "string") parts.push(`moderator_error=${meta.moderatorError}`);
+  if (Array.isArray(meta.discoveredTerms) && meta.discoveredTerms.length > 0) {
+    // A count only: header values stay ASCII and never carry request words.
+    parts.push(`discovered=${meta.discoveredTerms.length}`);
+  }
   return parts.join("; ");
 }
