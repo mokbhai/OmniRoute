@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
-import { Badge, Button, Card, Input, Select } from "@/shared/components";
+import { Button, Card, Input, Select } from "@/shared/components";
 
 import type { ApiKeyOption, PolicyConfigView } from "./textPoliciesApi";
 import { parseOptionalNumber } from "./textPolicyForm";
@@ -126,11 +126,14 @@ export default function TextPolicyKeyOverrides({
         {overriddenIds.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {overriddenIds.map((id) => (
-              <button key={id} type="button" onClick={() => selectKey(id)}>
-                <Badge variant={id === selectedKey ? "primary" : "default"}>
-                  {keyName.get(id) ?? id}
-                </Badge>
-              </button>
+              <Button
+                key={id}
+                size="sm"
+                variant={id === selectedKey ? "primary" : "outline"}
+                onClick={() => selectKey(id)}
+              >
+                {keyName.get(id) ?? id}
+              </Button>
             ))}
           </div>
         )}
@@ -229,7 +232,7 @@ export default function TextPolicyKeyOverrides({
             </div>
 
             {error && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="text-sm text-error">
                 {error}
               </p>
             )}

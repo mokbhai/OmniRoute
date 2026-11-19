@@ -89,7 +89,7 @@ export default function NewTextPolicyModal({
       }
     >
       <div className="space-y-4" data-testid="text-policy-new-modal">
-        <p className="text-sm text-muted-foreground">{t("textPolicyNewDesc")}</p>
+        <p className="text-sm text-text-muted">{t("textPolicyNewDesc")}</p>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Input
             label={t("textPolicyId")}
@@ -132,7 +132,7 @@ export default function NewTextPolicyModal({
           onChange={(event) => set({ terms: event.target.value })}
         />
         {error && (
-          <p role="alert" className="text-sm text-destructive" data-testid="text-policy-new-error">
+          <p role="alert" className="text-sm text-error" data-testid="text-policy-new-error">
             {error}
           </p>
         )}

@@ -108,7 +108,7 @@ export default function TextPolicyTerms({ policyId, onChanged }: TextPolicyTerms
         </Tabs>
 
         {error && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-sm text-error">
             {error === "load" ? t("textPolicyTermsLoadError") : t("textPolicyErrorSave")}
           </p>
         )}
@@ -132,7 +132,7 @@ export default function TextPolicyTerms({ policyId, onChanged }: TextPolicyTerms
                   <Badge size="sm" variant={term.source === "manual" ? "info" : "default"}>
                     {t(`textPolicyTermSource_${term.source}`)}
                   </Badge>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-text-muted">
                     {t("textPolicyTermHits", { hits: term.hits })}
                   </span>
                 </div>
@@ -225,7 +225,7 @@ export default function TextPolicyTerms({ policyId, onChanged }: TextPolicyTerms
             {t("textPolicyTermAddButton")}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">{t("textPolicyTermsHint")}</p>
+        <p className="text-xs text-text-muted">{t("textPolicyTermsHint")}</p>
       </div>
     </Card>
   );

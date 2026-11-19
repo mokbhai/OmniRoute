@@ -87,7 +87,7 @@ export default function TextPolicyTryIt({ policyId, apiKeys }: TextPolicyTryItPr
         </div>
 
         {error && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-sm text-error">
             {error}
           </p>
         )}
@@ -106,9 +106,7 @@ export default function TextPolicyTryIt({ policyId, apiKeys }: TextPolicyTryItPr
                 <Badge variant="info">{t(`textPolicyAction_${result.plan.action}`)}</Badge>
               )}
               {!result?.enabled && (
-                <span className="text-xs text-muted-foreground">
-                  {t("textPolicyTryDisabledNote")}
-                </span>
+                <span className="text-xs text-text-muted">{t("textPolicyTryDisabledNote")}</span>
               )}
             </div>
             <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
@@ -144,7 +142,7 @@ export default function TextPolicyTryIt({ policyId, apiKeys }: TextPolicyTryItPr
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-2">
-      <dt className="text-muted-foreground">{label}</dt>
+      <dt className="text-text-muted">{label}</dt>
       <dd className="font-mono break-all">{value}</dd>
     </div>
   );
@@ -154,7 +152,7 @@ function TermList({ label, terms }: { label: string; terms: string[] }) {
   if (terms.length === 0) return null;
   return (
     <div className="space-y-1">
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-xs text-text-muted">{label}</p>
       <div className="flex flex-wrap gap-1">
         {terms.map((term) => (
           <Badge key={term} size="sm" variant="default">

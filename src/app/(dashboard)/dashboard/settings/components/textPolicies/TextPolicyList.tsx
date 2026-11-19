@@ -46,6 +46,7 @@ export default function TextPolicyList({
                 selected ? "bg-muted/40" : ""
               }`}
             >
+              {/* kit-exception: two-line selectable row (name, badges, counts); the kit Button is single-line. */}
               <button
                 type="button"
                 className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left"
@@ -55,7 +56,7 @@ export default function TextPolicyList({
               >
                 <span className="flex flex-wrap items-center gap-2">
                   <span className="font-medium">{policy.label}</span>
-                  <code className="text-xs text-muted-foreground">{policy.id}</code>
+                  <code className="text-xs text-text-muted">{policy.id}</code>
                   <Badge size="sm" variant={policy.builtIn ? "info" : "default"}>
                     {policy.builtIn ? t("textPolicyBuiltIn") : t("textPolicyCustom")}
                   </Badge>
@@ -63,7 +64,7 @@ export default function TextPolicyList({
                     {t(`textPolicyMode_${policy.config.mode}`)}
                   </Badge>
                 </span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs text-text-muted">
                   {t("textPolicyCounts", {
                     seed: policy.seedTermCount,
                     active: policy.learnedTerms.active,

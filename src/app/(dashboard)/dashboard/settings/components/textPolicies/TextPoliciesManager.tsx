@@ -146,7 +146,7 @@ export default function TextPoliciesManager() {
       {notice && (
         <p
           role={notice.tone === "error" ? "alert" : "status"}
-          className={`text-sm ${notice.tone === "error" ? "text-destructive" : "text-muted-foreground"}`}
+          className={`text-sm ${notice.tone === "error" ? "text-error" : "text-text-muted"}`}
           data-testid="text-policy-notice"
         >
           {notice.text}

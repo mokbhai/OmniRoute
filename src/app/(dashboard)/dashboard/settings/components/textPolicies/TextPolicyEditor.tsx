@@ -177,8 +177,8 @@ export default function TextPolicyEditor({
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-sm font-medium">{t("textPolicyBandTitle")}</h3>
-          <p className="text-xs text-muted-foreground">{t("textPolicyBandDesc")}</p>
+          <h3 className="text-sm">{t("textPolicyBandTitle")}</h3>
+          <p className="text-xs text-text-muted">{t("textPolicyBandDesc")}</p>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Input
               type="number"
@@ -223,9 +223,7 @@ export default function TextPolicyEditor({
             value={form.moderationScoreThreshold}
             onChange={(event) => set({ moderationScoreThreshold: event.target.value })}
           />
-          <p className="text-xs text-muted-foreground md:col-span-2">
-            {t("textPolicyModeratorHint")}
-          </p>
+          <p className="text-xs text-text-muted md:col-span-2">{t("textPolicyModeratorHint")}</p>
         </section>
 
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -316,7 +314,7 @@ export default function TextPolicyEditor({
         </Collapsible>
 
         {error && (
-          <p role="alert" className="text-sm text-destructive" data-testid="text-policy-error">
+          <p role="alert" className="text-sm text-error" data-testid="text-policy-error">
             {error}
           </p>
         )}
