@@ -745,6 +745,13 @@ const CONFIGURATION_ITEMS: readonly SidebarItemDefinition[] = [
     icon: "image_search",
   },
   {
+    id: "settings-text-policies",
+    href: "/dashboard/settings/text-policies",
+    i18nKey: "settingsTextPolicies",
+    subtitleKey: "settingsTextPoliciesSubtitle",
+    icon: "policy",
+  },
+  {
     id: "settings-routing",
     href: "/dashboard/settings/routing",
     i18nKey: "globalRouting",

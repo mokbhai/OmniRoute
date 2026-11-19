@@ -160,6 +160,38 @@ Risk: in `auto` mode, a client that keeps sending violating text containing an
 ordinary word can get that word learned. `learnMinHits`, the appears-in-text check
 and stop words limit this. Use `review` to approve every term.
 
+## Dashboard
+
+**Settings → Text Policies** (`/dashboard/settings/text-policies`) edits everything on
+this page without the API. Sources live in
+`src/app/(dashboard)/dashboard/settings/components/textPolicies/`.
+
+1. **Policy list:** every built-in and custom policy, with an on/off switch, its
+   mode, and seed / learned / pending counts.
+2. **Editor:**
+   - mode and reroute target;
+   - low and high thresholds;
+   - moderator model and moderator score threshold;
+   - learn mode and minimum hits;
+   - under "What this policy looks for": name, description, moderation category,
+     moderator instruction, seed terms (`term:weight`, one per line), stop words and
+     priority. For a built-in policy, blank fields keep the built-in value, and seed
+     terms and stop words are added to the built-in ones.
+3. **Per API key:** pick a key and set only the fields that differ. Blank fields
+   show, and inherit, the global value. "Remove override" deletes the key's entry.
+4. **Learned words:** Pending, Active and Rejected tabs, with approve, reject,
+   change-weight and delete actions, plus adding a word by hand (active right away).
+5. **Try it:** paste text, optionally choose a key whose settings to use and a
+   requested model, and see the verdict, band, scores, matched and discovered words,
+   and the action. It is a dry run (`ignoreEnabled: true`, `learn: false`), but text
+   in the middle band still calls the moderator.
+6. **New policy:** id, name, moderator instruction, moderation category and seed
+   terms. A new policy starts **disabled** so it can be tried first.
+
+The page writes the whole `textPolicies` object with `PATCH /api/settings`,
+validated with the same Zod schema as the API. Learned words and Try it use the
+`/api/text-policies` routes.
+
 ## Plugging in another process
 
 ### In-process (TypeScript)
@@ -245,4 +277,5 @@ words. Logs carry scores and actions, never request text.
   traffic carries images.
 
 Regression guards: `tests/unit/text-policy/` (engine, catalog and moderator,
-guardrail, terms and routes).
+guardrail, terms and routes, form helpers) and `tests/unit/ui/text-policies-page.test.tsx`
+(the dashboard page).

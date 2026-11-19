@@ -104,6 +104,7 @@ export const HIDEABLE_SIDEBAR_ITEM_IDS = [
   "settings-appearance",
   "settings-ai",
   "settings-modality-bridge",
+  "settings-text-policies",
   "settings-routing",
   "settings-resilience",
   "settings-advanced",
