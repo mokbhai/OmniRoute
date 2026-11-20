@@ -22,6 +22,7 @@ import { timingSafeCompare } from "@/shared/utils/timingSafeCompare";
 import {
   evaluateTextPoliciesFor,
   extractPolicyText,
+  isOwnModeratorRequest,
   TEXT_POLICY_GUARDRAIL_NAME,
   type PolicyEvaluation,
   type TextPolicyEngineDeps,
@@ -71,11 +72,16 @@ export class TextPolicyGuardrail extends BaseGuardrail {
   }
 
   allowCallerDisable(context: GuardrailContext): boolean {
-    return (this.deps.isSelfLoopRequest ?? isSelfLoopGuardrailRequest)(context);
+    return (
+      isOwnModeratorRequest(context.headers) ||
+      (this.deps.isSelfLoopRequest ?? isSelfLoopGuardrailRequest)(context)
+    );
   }
 
   async preCall(payload: unknown, context: GuardrailContext): Promise<GuardrailResult<unknown>> {
     if (!payload || typeof payload !== "object") return { block: false };
+    // Our own moderator sub-request is never evaluated: it would recurse (see moderator.ts).
+    if (isOwnModeratorRequest(context.headers)) return { block: false };
     const requestedModel =
       typeof (payload as { model?: unknown }).model === "string"
         ? (payload as { model: string }).model
