@@ -38,6 +38,11 @@ export { clipPolicyText, extractPolicyText } from "./extract";
 export { buildTextPolicyHeader, TEXT_POLICY_GUARDRAIL_NAME, TEXT_POLICY_HEADER } from "./header";
 export { classifyKeywordBand, scoreText } from "./lexicon";
 export { invalidateLearnedTermsCache, validateDiscoveredTerms } from "./learning";
+export {
+  isOwnModeratorRequest,
+  MAX_IN_FLIGHT_CHAT_MODERATOR_CALLS,
+  MODERATOR_NONCE_HEADER,
+} from "./moderator";
 export type { ModerateFn, ModeratorPolicy, ModeratorResult } from "./moderator";
 export { SEXUAL_CONTENT_POLICY } from "./policies/sexualContent";
 export type * from "./types";

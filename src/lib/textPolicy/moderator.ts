@@ -14,12 +14,14 @@
  * operator's connection and is not narrowed to the caller key's connection scope.
  */
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import {
   getModerationProvider,
   parseModerationModel,
 } from "@omniroute/open-sse/config/moderationRegistry.ts";
+
+import { getProcessStore } from "@/shared/utils/processSingleton";
 
 import { TEXT_POLICY_GUARDRAIL_NAME } from "./header";
 
@@ -47,6 +49,8 @@ export interface ModeratorFailure {
     | "moderator_http_error"
     | "moderator_error"
     | "moderator_unparseable"
+    | "moderator_busy"
+    | "moderator_timeout"
     | "no_category_score";
   status?: number;
 }
@@ -145,6 +149,53 @@ async function callModerationApi(
   return { ok: true, score, cached: false, kind: "moderation" };
 }
 
+// ─── Loop safety ─────────────────────────────────────────────────────────────
+//
+// The chat moderator calls OmniRoute's own /v1/chat/completions. That sub-request must
+// never be moderated again (its prompt even contains words from the policy's lexicon), or
+// every level would spawn another moderator call. Three independent safeguards:
+//   1. a one-time nonce that proves a request is this process's own in-flight moderator call;
+//   2. the self-loop bearer + disable header (see guardrails/textPolicy.ts). Across worker
+//      processes this only holds when OMNIROUTE_API_KEY / ROUTER_API_KEY is set: the
+//      generated self-loop secret is per process, like the nonce;
+//   3. a hard cap on moderator calls in flight, so even if both identity checks failed the
+//      nesting stops at the cap and the policy fails open (`moderator_busy`).
+
+export const MODERATOR_NONCE_HEADER = "x-omniroute-text-policy-nonce";
+/** Hard bound on nested/concurrent chat-moderator calls per process. */
+export const MAX_IN_FLIGHT_CHAT_MODERATOR_CALLS = 32;
+export const CHAT_MODERATOR_TIMEOUT_MS = 30_000;
+
+/** Nonces of this process's in-flight chat-moderator calls (shared across bundle copies). */
+const inFlightNonces = getProcessStore("textPolicyModeratorNonces", () => new Set<string>());
+
+export function inFlightChatModeratorCalls(): number {
+  return inFlightNonces.size;
+}
+
+function readHeader(
+  headers: Headers | Record<string, unknown> | null | undefined,
+  name: string
+): string | null {
+  if (!headers) return null;
+  if (typeof (headers as Headers).get === "function") return (headers as Headers).get(name);
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === name && typeof value === "string") return value;
+  }
+  return null;
+}
+
+/**
+ * True when the request is one of this process's own in-flight moderator sub-requests.
+ * A forged or stale nonce is never accepted.
+ */
+export function isOwnModeratorRequest(
+  headers: Headers | Record<string, unknown> | null | undefined
+): boolean {
+  const nonce = readHeader(headers, MODERATOR_NONCE_HEADER);
+  return typeof nonce === "string" && nonce.length > 0 && inFlightNonces.has(nonce);
+}
+
 // ─── Chat-model moderator ────────────────────────────────────────────────────
 
 export function buildChatModeratorPrompt(policy: ModeratorPolicy): string {
@@ -197,42 +248,53 @@ async function callChatModerator(
   text: string,
   signal?: AbortSignal
 ): Promise<ModeratorResult> {
-  const [{ getRuntimePorts }, identity] = await Promise.all([
-    import("@/lib/runtime/ports"),
-    import("@/shared/middleware/chatAdmissionIdentity"),
-  ]);
-  const response = await fetch(`http://localhost:${getRuntimePorts().port}/v1/chat/completions`, {
-    method: "POST",
-    signal,
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      Authorization: `Bearer ${identity.resolveSelfLoopBearer()}`,
-      // Recursion guard: the moderation sub-request carries the same text, so it must
-      // not be evaluated again. Prompt-injection is skipped because the reply is
-      // constrained JSON and every reported term is checked against the text.
-      "x-omniroute-disabled-guardrails": `${TEXT_POLICY_GUARDRAIL_NAME},prompt-injection`,
-      "x-omniroute-compression": "off",
-      // The parent request already holds the heavyweight admission lease.
-      [identity.ADMISSION_BYPASS_HEADER]: "internal",
-    },
-    body: JSON.stringify({
-      model,
-      stream: false,
-      temperature: 0,
-      max_tokens: 400,
-      messages: [
-        { role: "system", content: buildChatModeratorPrompt(policy) },
-        { role: "user", content: `TEXT:\n<<<\n${text}\n>>>` },
-      ],
-    }),
-  });
-  if (!response.ok) {
-    return { ok: false, reason: "moderator_http_error", status: response.status };
+  if (inFlightNonces.size >= MAX_IN_FLIGHT_CHAT_MODERATOR_CALLS) {
+    return { ok: false, reason: "moderator_busy" };
   }
-  const parsed = parseChatModeratorReply(chatReplyContent(await response.json()));
-  if (!parsed) return { ok: false, reason: "moderator_unparseable" };
-  return { ok: true, score: parsed.score, cached: false, kind: "chat", terms: parsed.terms };
+  const nonce = randomUUID();
+  inFlightNonces.add(nonce);
+  try {
+    const [{ getRuntimePorts }, identity] = await Promise.all([
+      import("@/lib/runtime/ports"),
+      import("@/shared/middleware/chatAdmissionIdentity"),
+    ]);
+    const timeout = AbortSignal.timeout(CHAT_MODERATOR_TIMEOUT_MS);
+    const response = await fetch(`http://localhost:${getRuntimePorts().port}/v1/chat/completions`, {
+      method: "POST",
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        Authorization: `Bearer ${identity.resolveSelfLoopBearer()}`,
+        // Recursion guards: the moderation sub-request carries the same text, so it must
+        // not be evaluated again. Prompt-injection is skipped because the reply is
+        // constrained JSON and every reported term is checked against the text.
+        "x-omniroute-disabled-guardrails": `${TEXT_POLICY_GUARDRAIL_NAME},prompt-injection`,
+        [MODERATOR_NONCE_HEADER]: nonce,
+        "x-omniroute-compression": "off",
+        // The parent request already holds the heavyweight admission lease.
+        [identity.ADMISSION_BYPASS_HEADER]: "internal",
+      },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        temperature: 0,
+        max_tokens: 400,
+        messages: [
+          { role: "system", content: buildChatModeratorPrompt(policy) },
+          { role: "user", content: `TEXT:\n<<<\n${text}\n>>>` },
+        ],
+      }),
+    });
+    if (!response.ok) {
+      return { ok: false, reason: "moderator_http_error", status: response.status };
+    }
+    const parsed = parseChatModeratorReply(chatReplyContent(await response.json()));
+    if (!parsed) return { ok: false, reason: "moderator_unparseable" };
+    return { ok: true, score: parsed.score, cached: false, kind: "chat", terms: parsed.terms };
+  } finally {
+    inFlightNonces.delete(nonce);
+  }
 }
 
 /**
@@ -248,8 +310,9 @@ export const defaultModerate: ModerateFn = async ({ policy, model, text, signal 
     result = isModerationApiModel(model)
       ? await callModerationApi(policy, model, text)
       : await callChatModerator(policy, model, text, signal);
-  } catch {
-    return { ok: false, reason: "moderator_error" };
+  } catch (error) {
+    const timedOut = (error as { name?: string } | null)?.name === "TimeoutError";
+    return { ok: false, reason: timedOut ? "moderator_timeout" : "moderator_error" };
   }
   if (result.ok) {
     if (verdictCache.size >= CACHE_MAX_ENTRIES) {

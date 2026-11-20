@@ -268,10 +268,39 @@ x-omniroute-text-policy: sexual-content=violation; stage=moderator; action=rerou
 With several policies, entries are comma-separated. The header carries counts, never
 words. Logs carry scores and actions, never request text.
 
+## Loop safety
+
+A policy never re-evaluates its own output, so a rerouted request cannot loop:
+
+- The guardrails run **once per incoming request**, in `handleChat()`, before combo resolution.
+  Combo targets and retries do not re-enter them.
+- A reroute is a **fixed point**: a request already on the reroute target is left alone
+  (`already_target`), so applying the policy to its own output changes nothing.
+- The only call a policy makes into OmniRoute is the chat moderator's sub-request to
+  `/v1/chat/completions`. It is never evaluated again, because its prompt is built from the
+  policy's own wording and would otherwise match it. Three independent safeguards (in
+  `src/lib/textPolicy/moderator.ts`):
+  1. a one-time **nonce** header that is valid only while that call is in flight, so a request
+     carrying it is provably this process's own moderator call (a client cannot guess one);
+  2. the **self-loop bearer** and disable header. Across worker processes this only holds when
+     `OMNIROUTE_API_KEY` (or `ROUTER_API_KEY`) is set, because the generated self-loop secret is
+     per process, like the nonce;
+  3. a hard cap of **32 moderator calls in flight** per process. If both identity checks ever
+     failed, nesting would stop at the cap and the policy would fail open
+     (`moderator_error=moderator_busy`, plus a warning in the server log).
+- The moderator call has a **30 second timeout** and fails open (`moderator_timeout`).
+
+Regression guard: `tests/integration/text-policy-no-loop.test.ts` runs the real pipeline, hands the
+moderator's call back to `handleChat()` like the HTTP listener does, and counts every upstream and
+self-loop call, including a run with all identity checks stripped.
+
 ## Limits
 
 - Requests only: the check runs before the upstream call, so an answer that turns
   explicit is not caught.
+- Guardrails, text policies included, run only inside `handleChat()`. When the optional Bifrost fast
+  path (`/api/v1/relay/chat/completions`) answers a request itself, that request never reaches
+  them.
 - If the vision bridge already rerouted an image request and a text policy then
   reroutes it, the text-policy target wins. Pick a vision-capable target if that
   traffic carries images.
