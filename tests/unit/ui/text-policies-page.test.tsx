@@ -35,6 +35,8 @@ const CONFIG = {
   rerouteTarget: null,
   learnMode: "auto",
   learnMinHits: 2,
+  learnMinModeratorScore: 0.85,
+  translateLanguages: ["es", "zh"],
 };
 
 function setupApi() {
@@ -50,6 +52,19 @@ function setupApi() {
         status: "pending",
         source: "moderator",
         hits: 1,
+        lastModeratorModel: "groq/judge",
+        lastSeenAt: "2026-11-19T00:00:00Z",
+      },
+      {
+        term: "en cueros",
+        weight: 3,
+        status: "pending",
+        source: "translation",
+        hits: 0,
+        language: "es",
+        meaning: "naked",
+        category: "nudity",
+        sourceTerm: "sem roupa",
         lastModeratorModel: "groq/judge",
         lastSeenAt: "2026-11-19T00:00:00Z",
       },
@@ -74,8 +89,13 @@ function setupApi() {
             moderationCategory: "sexual",
             classifierInstruction: "how sexual the TEXT is",
             seedTermCount: 120,
+            termCategories: [
+              { id: "explicit", description: "explicit", weight: 5 },
+              { id: "nudity", description: "nudity", weight: 3 },
+              { id: "minor", description: "minors", weight: 0 },
+            ],
             config: CONFIG,
-            learnedTerms: { pending: 1, active: 0, rejected: 0 },
+            learnedTerms: { pending: 2, active: 0, rejected: 0 },
           },
         ],
       });
@@ -234,6 +254,42 @@ describe("Text Policies settings page", () => {
     const put = calls.find((call) => call.method === "PUT");
     expect(put?.url).toBe("/api/text-policies/sexual-content/terms");
     expect(put?.body).toEqual({ term: "freaky", status: "active" });
+  });
+
+  it("4b · shows each word's language, meaning and what it translates", async () => {
+    setupApi();
+    await render(<TextPoliciesManager />);
+    const row = q('[data-testid="tpol-term-en cueros"]').textContent ?? "";
+    expect(q('[data-testid="tpol-term-lang-en cueros"]').textContent).toBe("ES");
+    expect(row).toContain("textPolicyTermSource_translation");
+    expect(row).toContain("naked");
+    expect(row).toContain("nudity");
+    expect(row).toContain("textPolicyTermTranslationOf(sem roupa)");
+    expect(q('[data-testid="tpol-categories"]').textContent).toBe(
+      "textPolicyCategoriesHint(explicit (5), nudity (3)|minor)"
+    );
+  });
+
+  it("4c · saves the learn score and translation languages; empty means none", async () => {
+    const { calls } = setupApi();
+    await render(<TextPoliciesManager />);
+    expect(field("tpol-translate-languages").value).toBe("es, zh");
+    await act(async () => setValue(field("tpol-translate-languages"), "es, english"));
+    await click(q('[data-testid="tpol-save"]'));
+    expect(q('[data-testid="tpol-error"]').textContent).toBe("textPolicyErrorLanguages(english)");
+    expect(lastPatch(calls)).toBeUndefined();
+
+    await act(async () => setValue(field("tpol-translate-languages"), "pt-BR, JA"));
+    await act(async () => setValue(field("tpol-learn-min-score"), "0.9"));
+    await click(q('[data-testid="tpol-save"]'));
+    let saved = lastPatch(calls)?.textPolicies["sexual-content"];
+    expect(saved?.translateLanguages).toEqual(["pt", "ja"]);
+    expect(saved?.learnMinModeratorScore).toBe(0.9);
+
+    await act(async () => setValue(field("tpol-translate-languages"), ""));
+    await click(q('[data-testid="tpol-save"]'));
+    saved = lastPatch(calls)?.textPolicies["sexual-content"];
+    expect(saved?.translateLanguages).toEqual([]);
   });
 
   it("5 · try it runs a dry-run evaluation and shows the verdict", async () => {

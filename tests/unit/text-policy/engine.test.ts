@@ -250,15 +250,17 @@ test("a second policy (violence) runs on the same engine with its own lexicon an
 
 // ─── Learning ────────────────────────────────────────────────────────────────
 
-test("chat moderator: discovered terms are validated, returned with weights and recorded per policy", async () => {
+test("chat moderator: discovered terms are validated, weighted by category and recorded per policy", async () => {
   const { engineDeps, recorded } = deps(0.88, {
     terms: [
-      { term: "freaky", weight: 3 },
-      { term: "Frisky", weight: 1 },
-      { term: "erotic", weight: 3 }, // seed term → dropped
-      { term: "moaning", weight: 5 }, // not in the text → dropped
-      { term: "story", weight: 1 }, // stop word → dropped
-      { term: "<script>", weight: 5 }, // markup → dropped
+      // The category sets the weight; the moderator's own weight is ignored.
+      { term: "freaky", lang: "en", meaning: "sexually wild", category: "slang", weight: 1 },
+      { term: "Frisky", lang: "en", meaning: "playful", category: "context", weight: 5 },
+      { term: "couch", weight: 5 }, // no category → never learned
+      { term: "erotic", category: "explicit" }, // seed term → dropped
+      { term: "moaning", category: "explicit" }, // not in the text → dropped
+      { term: "story", category: "explicit" }, // stop word → dropped
+      { term: "<script>", category: "explicit" }, // markup → dropped
       null,
     ],
   });
@@ -268,8 +270,11 @@ test("chat moderator: discovered terms are validated, returned with weights and 
   );
   assert.equal(decision.moderatorKind, "chat");
   assert.deepEqual(decision.discoveredTerms, [
-    { term: "freaky", weight: 3 },
-    { term: "frisky", weight: 1 },
+    { term: "freaky", weight: 5, category: "slang", language: "en", meaning: "sexually wild" },
+  ]);
+  assert.deepEqual(decision.ignoredTerms, [
+    { term: "frisky", category: "context" },
+    { term: "couch", category: "unclassified" },
   ]);
   assert.equal(recorded.length, 1);
   assert.equal(recorded[0].policy, "sexual-content");
@@ -280,8 +285,8 @@ test("chat moderator: discovered terms are validated, returned with weights and 
   });
 });
 
-test("learning: review / off modes, clean and cached verdicts, and dry runs", async () => {
-  const terms = [{ term: "freaky", weight: 3 }];
+test("learning: review / off modes, clean, unsure and cached verdicts, and dry runs", async () => {
+  const terms = [{ term: "freaky", category: "nudity" }];
   const run = async (cfg: Partial<TextPolicyConfig>, score: number, extra = {}, learn = true) => {
     const d = deps(score, { terms, ...extra });
     const decision = await evaluateTextPolicy(
@@ -299,24 +304,33 @@ test("learning: review / off modes, clean and cached verdicts, and dry runs", as
   for (const [label, result, reason] of [
     ["off", await run({ learnMode: "off" }, 0.9), "learning_off"],
     ["clean", await run({}, 0.1), "no_violation"],
+    // A violation (0.7 ≥ 0.5) that is not certain enough to teach (< 0.85).
+    ["unsure", await run({}, 0.7), "low_confidence"],
     ["cached", await run({}, 0.9, { cached: true }), "cached_verdict"],
     ["dry run", await run({}, 0.9, {}, false), "learning_off"],
   ] as const) {
     assert.equal(result.recorded.length, 0, label);
     assert.equal(result.decision.learning?.skipped, reason, label);
-    assert.deepEqual(result.decision.discoveredTerms, [{ term: "freaky", weight: 3 }], label);
+    assert.deepEqual(
+      result.decision.discoveredTerms,
+      [{ term: "freaky", weight: 3, category: "nudity" }],
+      label
+    );
   }
 });
 
 test("validateDiscoveredTerms honors the policy's own seed terms and stop words", () => {
   const text = "a gore scene with carnage and mayhem";
+  const reported = ["gore", "carnage", "mayhem"].map((term) => ({ term, category: "core" }));
   assert.deepEqual(
-    validateDiscoveredTerms(["gore", "carnage", "mayhem"], text, {
+    validateDiscoveredTerms(reported, text, {
       seedTerms: VIOLENCE.seedTerms,
       stopWords: ["mayhem"],
     }),
-    [{ term: "carnage", weight: 1 }]
+    [{ term: "carnage", weight: 5, category: "core" }]
   );
+  // A bare string has no category, so it is never learned.
+  assert.deepEqual(validateDiscoveredTerms(["carnage"], text, VIOLENCE), []);
 });
 
 // ─── Action plans ────────────────────────────────────────────────────────────

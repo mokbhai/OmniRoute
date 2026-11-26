@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { requireManagementAuth } from "@/lib/api/requireManagementAuth";
 import { getCachedSettings } from "@/lib/db/readCache";
 import { countTextPolicyTerms } from "@/lib/db/textPolicyTerms";
-import { listTextPolicyDefinitions, resolveTextPolicyConfig } from "@/lib/textPolicy";
+import {
+  listTextPolicyDefinitions,
+  resolveTextPolicyConfig,
+  termCategoriesFor,
+} from "@/lib/textPolicy";
 
 import { routeFailure } from "./_shared/policyRoute";
 
@@ -35,6 +39,7 @@ export async function GET(request: Request) {
         moderationCategory: definition.moderationCategory,
         classifierInstruction: definition.classifierInstruction,
         seedTermCount: definition.seedTerms.length,
+        termCategories: termCategoriesFor(definition),
         config: resolveTextPolicyConfig(settings, definition.id, null).config,
         learnedTerms,
       };

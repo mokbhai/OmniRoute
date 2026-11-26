@@ -127,14 +127,36 @@ export default function TextPolicyTerms({ policyId, onChanged }: TextPolicyTerms
                 className="flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between"
                 data-testid={`tpol-term-${term.term}`}
               >
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className="font-medium break-all">{term.term}</span>
-                  <Badge size="sm" variant={term.source === "manual" ? "info" : "default"}>
-                    {t(`textPolicyTermSource_${term.source}`)}
-                  </Badge>
-                  <span className="text-xs text-text-muted">
-                    {t("textPolicyTermHits", { hits: term.hits })}
-                  </span>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="font-medium break-all">{term.term}</span>
+                    {term.language && (
+                      <Badge
+                        size="sm"
+                        variant="default"
+                        data-testid={`tpol-term-lang-${term.term}`}
+                      >
+                        {term.language.toUpperCase()}
+                      </Badge>
+                    )}
+                    <Badge size="sm" variant={term.source === "moderator" ? "default" : "info"}>
+                      {t(`textPolicyTermSource_${term.source}`)}
+                    </Badge>
+                    {term.category && (
+                      <span className="text-xs text-text-muted">{term.category}</span>
+                    )}
+                    <span className="text-xs text-text-muted">
+                      {t("textPolicyTermHits", { hits: term.hits })}
+                    </span>
+                  </div>
+                  {(term.meaning || term.sourceTerm) && (
+                    <p className="text-xs text-text-muted break-all">
+                      {term.meaning && <span>“{term.meaning}”</span>}
+                      {term.meaning && term.sourceTerm && " · "}
+                      {term.sourceTerm &&
+                        t("textPolicyTermTranslationOf", { term: term.sourceTerm })}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="w-20">

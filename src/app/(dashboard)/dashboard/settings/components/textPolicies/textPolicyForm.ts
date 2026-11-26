@@ -9,6 +9,7 @@
 
 import {
   TEXT_POLICY_ID_PATTERN,
+  TEXT_POLICY_LANGUAGE_PATTERN,
   textPoliciesSettingsSchema,
 } from "@/shared/validation/textPolicySchema";
 
@@ -25,6 +26,8 @@ export const CONFIG_FIELDS = [
   "rerouteTarget",
   "learnMode",
   "learnMinHits",
+  "learnMinModeratorScore",
+  "translateLanguages",
 ] as const;
 export type ConfigField = (typeof CONFIG_FIELDS)[number];
 
@@ -86,6 +89,10 @@ export function setPolicyGlobalFields(
 ): StoredPolicies {
   const current = policies[policyId] ?? {};
   const next: Record<string, unknown> = compactFields(fields);
+  // An empty language list means "no translations"; blank must not fall back to the default.
+  if (Array.isArray(fields.translateLanguages) && fields.translateLanguages.length === 0) {
+    next.translateLanguages = [];
+  }
   if (current.keyOverrides !== undefined) next.keyOverrides = current.keyOverrides;
   return { ...policies, [policyId]: next };
 }
@@ -184,6 +191,23 @@ export function parseWordLines(text: string): string[] {
 
 export function formatWordLines(value: unknown): string {
   return Array.isArray(value) ? value.filter((v) => typeof v === "string").join("\n") : "";
+}
+
+/**
+ * Comma- or line-separated language codes ("es, pt-BR, zh") → ["es", "pt", "zh"].
+ * `invalid` lists entries that are not language codes.
+ */
+export function parseLanguageList(text: string): { languages: string[]; invalid: string[] } {
+  const languages: string[] = [];
+  const invalid: string[] = [];
+  for (const raw of text.split(/[\n,\s]+/)) {
+    const entry = raw.trim();
+    if (!entry) continue;
+    const code = entry.toLowerCase().split(/[-_]/)[0];
+    if (!TEXT_POLICY_LANGUAGE_PATTERN.test(code)) invalid.push(entry);
+    else if (!languages.includes(code)) languages.push(code);
+  }
+  return { languages, invalid };
 }
 
 /** Blank → undefined, otherwise a finite number (or NaN for garbage). */

@@ -20,6 +20,14 @@ export interface PolicyConfigView {
   rerouteTarget: string | null;
   learnMode: "auto" | "review" | "off";
   learnMinHits: number;
+  learnMinModeratorScore: number;
+  translateLanguages: string[];
+}
+
+export interface TermCategoryView {
+  id: string;
+  description: string;
+  weight: number;
 }
 
 export interface PolicySummary {
@@ -31,6 +39,7 @@ export interface PolicySummary {
   moderationCategory: string;
   classifierInstruction: string;
   seedTermCount: number;
+  termCategories?: TermCategoryView[];
   config: PolicyConfigView;
   learnedTerms: { pending: number; active: number; rejected: number };
 }
@@ -41,8 +50,12 @@ export interface LearnedTerm {
   term: string;
   weight: number;
   status: TermStatus;
-  source: "moderator" | "manual";
+  source: "moderator" | "manual" | "translation";
   hits: number;
+  language?: string | null;
+  meaning?: string | null;
+  category?: string | null;
+  sourceTerm?: string | null;
   lastModeratorModel: string | null;
   lastSeenAt: string;
 }
@@ -65,7 +78,14 @@ export interface EvaluateResult {
     moderatorModel?: string | null;
     moderatorScore?: number;
     moderatorError?: string;
-    discoveredTerms?: Array<{ term: string; weight: number }>;
+    discoveredTerms?: Array<{
+      term: string;
+      weight: number;
+      language?: string;
+      meaning?: string;
+      category?: string;
+    }>;
+    ignoredTerms?: Array<{ term: string; category: string }>;
   } | null;
   plan?: { action: string; block: boolean; toModel?: string };
 }

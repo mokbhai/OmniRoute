@@ -129,7 +129,18 @@ export default function TextPolicyTryIt({ policyId, apiKeys }: TextPolicyTryItPr
             {decision.discoveredTerms && decision.discoveredTerms.length > 0 && (
               <TermList
                 label={t("textPolicyTryDiscovered")}
-                terms={decision.discoveredTerms.map((entry) => `${entry.term} (${entry.weight})`)}
+                terms={decision.discoveredTerms.map((entry) => {
+                  const about = [entry.language?.toUpperCase(), entry.category, entry.meaning]
+                    .filter(Boolean)
+                    .join(", ");
+                  return `${entry.term} (${entry.weight}${about ? `; ${about}` : ""})`;
+                })}
+              />
+            )}
+            {decision.ignoredTerms && decision.ignoredTerms.length > 0 && (
+              <TermList
+                label={t("textPolicyTryIgnored")}
+                terms={decision.ignoredTerms.map((entry) => `${entry.term} (${entry.category})`)}
               />
             )}
           </div>

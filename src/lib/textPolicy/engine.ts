@@ -18,7 +18,12 @@ import { getCachedSettings } from "@/lib/db/readCache";
 import { listTextPolicyDefinitions, resolveTextPolicyDefinition } from "./catalog";
 import { resolveTextPolicyConfig } from "./config";
 import { classifyKeywordBand, scoreText } from "./lexicon";
-import { loadActiveLearnedTerms, recordLearnedTerms, validateDiscoveredTerms } from "./learning";
+import {
+  classifyDiscoveredTerms,
+  loadActiveLearnedTerms,
+  recordLearnedTerms,
+  translateAcceptedTerms,
+} from "./learning";
 import {
   clipModeratorInput,
   defaultModerate,
@@ -44,6 +49,12 @@ export interface TextPolicyEngineDeps {
   moderate?: ModerateFn;
   loadLearnedTerms?: (policyId: string) => Promise<KeywordTerm[]>;
   recordLearnedTerms?: typeof recordLearnedTerms;
+  /** Requests translations of newly accepted terms. Default: in the background. */
+  translateTerms?: (
+    policy: TextPolicyDefinition,
+    terms: string[],
+    config: TextPolicyConfig
+  ) => Promise<unknown>;
 }
 
 export interface EvaluateTextPolicyInput {
@@ -109,8 +120,18 @@ export async function evaluateTextPolicy(
       decision.moderatorCached = verdict.cached;
       decision.violation = verdict.score >= config.moderationScoreThreshold;
       if (verdict.kind === "chat") {
-        decision.discoveredTerms = validateDiscoveredTerms(verdict.terms, text, policy);
-        await learnFromVerdict(decision, config, verdict.cached, input.learn !== false, deps, log);
+        const { terms, ignored } = classifyDiscoveredTerms(verdict.terms, text, policy);
+        decision.discoveredTerms = terms;
+        if (ignored.length > 0) decision.ignoredTerms = ignored;
+        await learnFromVerdict(
+          policy,
+          decision,
+          config,
+          verdict.cached,
+          input.learn !== false,
+          deps,
+          log
+        );
       }
     } else {
       decision.moderatorError = verdict.reason;
@@ -126,8 +147,12 @@ export async function evaluateTextPolicy(
   return decision;
 }
 
-/** Only fresh violations teach; cached verdicts, clean verdicts and dry runs never add hits. */
+/**
+ * Only fresh, confident violations teach: cached verdicts, clean verdicts, verdicts below
+ * `learnMinModeratorScore` and dry runs never add hits.
+ */
 async function learnFromVerdict(
+  policy: TextPolicyDefinition,
   decision: TextPolicyDecision,
   config: TextPolicyConfig,
   cached: boolean,
@@ -145,6 +170,8 @@ async function learnFromVerdict(
   if (terms.length === 0) outcome.skipped = "no_new_terms";
   else if (config.learnMode === "off" || !learnAllowed) outcome.skipped = "learning_off";
   else if (!decision.violation) outcome.skipped = "no_violation";
+  else if ((decision.moderatorScore ?? 0) < config.learnMinModeratorScore)
+    outcome.skipped = "low_confidence";
   else if (cached) outcome.skipped = "cached_verdict";
   if (outcome.skipped) return;
   try {
@@ -159,6 +186,14 @@ async function learnFromVerdict(
       log?.info?.("TEXT_POLICY", `[${decision.policy}] learned terms activated`, {
         count: result.activated.length,
       });
+      if (config.moderatorModel && config.translateLanguages.length > 0) {
+        outcome.translating = result.activated;
+        // Never blocks the request: translations are a second model call.
+        const translate = deps.translateTerms ?? translateAcceptedTerms;
+        void Promise.resolve()
+          .then(() => translate(policy, result.activated, config))
+          .catch(() => undefined);
+      }
     }
   } catch {
     outcome.skipped = "store_error";
