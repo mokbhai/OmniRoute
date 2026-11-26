@@ -11,6 +11,7 @@
  *         "enabled": true, "mode": "reroute", "lowThreshold": 3, "highThreshold": 10,
  *         "moderatorModel": "groq/llama-3.3-70b", "moderationScoreThreshold": 0.5,
  *         "rerouteTarget": "combo/nsfw-ok", "learnMode": "auto", "learnMinHits": 2,
+ *         "learnMinModeratorScore": 0.85, "translateLanguages": ["es", "pt", "zh"],
  *         "keyOverrides": { "<apiKeyId>": { "enabled": false } }
  *       }
  *     }
@@ -23,6 +24,7 @@ import {
 } from "@/shared/validation/textPolicySchema";
 
 import { readTextPolicySettings } from "./catalog";
+import { DEFAULT_TRANSLATE_LANGUAGES } from "./categories";
 import type { TextPolicyConfig } from "./types";
 
 export const DEFAULT_TEXT_POLICY_CONFIG: Readonly<TextPolicyConfig> = Object.freeze({
@@ -35,6 +37,8 @@ export const DEFAULT_TEXT_POLICY_CONFIG: Readonly<TextPolicyConfig> = Object.fre
   rerouteTarget: null,
   learnMode: "auto",
   learnMinHits: 2,
+  learnMinModeratorScore: 0.85,
+  translateLanguages: [...DEFAULT_TRANSLATE_LANGUAGES],
 });
 
 export interface ResolvedTextPolicyConfig {
@@ -83,6 +87,10 @@ function applyLayer(base: TextPolicyConfig, layer: TextPolicyOverride) {
     set("moderationScoreThreshold", layer.moderationScoreThreshold);
   if (layer.learnMode !== undefined) set("learnMode", layer.learnMode);
   if (layer.learnMinHits !== undefined) set("learnMinHits", layer.learnMinHits);
+  if (layer.learnMinModeratorScore !== undefined)
+    set("learnMinModeratorScore", layer.learnMinModeratorScore);
+  if (layer.translateLanguages !== undefined)
+    set("translateLanguages", [...new Set(layer.translateLanguages)]);
   const moderatorModel = emptyToNull(layer.moderatorModel);
   if (moderatorModel !== undefined) set("moderatorModel", moderatorModel);
   const rerouteTarget = emptyToNull(layer.rerouteTarget);

@@ -19,6 +19,7 @@ import type { PolicySummary } from "./textPoliciesApi";
 import {
   formatTermLines,
   formatWordLines,
+  parseLanguageList,
   parseOptionalNumber,
   parseTermLines,
   parseWordLines,
@@ -43,6 +44,8 @@ interface FormState {
   rerouteTarget: string;
   learnMode: string;
   learnMinHits: string;
+  learnMinModeratorScore: string;
+  translateLanguages: string;
   label: string;
   description: string;
   moderationCategory: string;
@@ -68,6 +71,8 @@ function initialForm(policy: PolicySummary, stored: Record<string, unknown>): Fo
     rerouteTarget: c.rerouteTarget ?? "",
     learnMode: c.learnMode,
     learnMinHits: String(c.learnMinHits),
+    learnMinModeratorScore: String(c.learnMinModeratorScore ?? 0.85),
+    translateLanguages: (c.translateLanguages ?? []).join(", "),
     label: str(stored.label),
     description: str(stored.description),
     moderationCategory: str(stored.moderationCategory),
@@ -117,6 +122,11 @@ export default function TextPolicyEditor({
       setError(t("textPolicyErrorTerms", { lines: seed.invalid.slice(0, 3).join(", ") }));
       return;
     }
+    const languages = parseLanguageList(form.translateLanguages);
+    if (languages.invalid.length > 0) {
+      setError(t("textPolicyErrorLanguages", { codes: languages.invalid.slice(0, 3).join(", ") }));
+      return;
+    }
     if (!policy.builtIn && seed.terms.length === 0 && !form.classifierInstruction.trim()) {
       setError(t("textPolicyErrorDefinition"));
       return;
@@ -132,6 +142,8 @@ export default function TextPolicyEditor({
       rerouteTarget: form.rerouteTarget,
       learnMode: form.learnMode,
       learnMinHits: parseOptionalNumber(form.learnMinHits),
+      learnMinModeratorScore: parseOptionalNumber(form.learnMinModeratorScore),
+      translateLanguages: languages.languages,
       label: form.label,
       description: form.description,
       moderationCategory: form.moderationCategory,
@@ -244,6 +256,41 @@ export default function TextPolicyEditor({
             disabled={form.learnMode !== "auto"}
             onChange={(event) => set({ learnMinHits: event.target.value })}
           />
+          <Input
+            type="number"
+            min={0}
+            max={1}
+            step={0.05}
+            label={t("textPolicyLearnMinScore")}
+            hint={t("textPolicyLearnMinScoreHint")}
+            value={form.learnMinModeratorScore}
+            disabled={form.learnMode === "off"}
+            data-testid="tpol-learn-min-score"
+            onChange={(event) => set({ learnMinModeratorScore: event.target.value })}
+          />
+          <Input
+            label={t("textPolicyTranslateLanguages")}
+            hint={t("textPolicyTranslateLanguagesHint")}
+            placeholder="es, pt, fr, zh, ja"
+            value={form.translateLanguages}
+            disabled={form.learnMode === "off"}
+            data-testid="tpol-translate-languages"
+            onChange={(event) => set({ translateLanguages: event.target.value })}
+          />
+          {policy.termCategories && policy.termCategories.length > 0 && (
+            <p className="text-xs text-text-muted md:col-span-2" data-testid="tpol-categories">
+              {t("textPolicyCategoriesHint", {
+                learned: policy.termCategories
+                  .filter((category) => category.weight > 0)
+                  .map((category) => `${category.id} (${category.weight})`)
+                  .join(", "),
+                ignored: policy.termCategories
+                  .filter((category) => category.weight <= 0)
+                  .map((category) => category.id)
+                  .join(", "),
+              })}
+            </p>
+          )}
         </section>
 
         <Collapsible

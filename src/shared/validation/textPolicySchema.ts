@@ -25,6 +25,10 @@ export type TextPolicyMode = (typeof TEXT_POLICY_MODES)[number];
 export const TEXT_POLICY_LEARN_MODES = ["auto", "review", "off"] as const;
 export type TextPolicyLearnMode = (typeof TEXT_POLICY_LEARN_MODES)[number];
 
+/** ISO 639-1 (two letters) or 639-2/3 (three letters) language code. */
+export const TEXT_POLICY_LANGUAGE_PATTERN = /^[a-z]{2,3}$/;
+export const MAX_TRANSLATE_LANGUAGES = 30;
+
 export const TEXT_POLICY_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,47}$/;
 export const textPolicyIdSchema = z.string().regex(TEXT_POLICY_ID_PATTERN, {
   message: "policy id must match [a-z0-9][a-z0-9-]{0,47}",
@@ -59,6 +63,16 @@ export const textPolicyOverrideSchema = z
     learnMode: z.enum(TEXT_POLICY_LEARN_MODES).optional(),
     /** In `auto` learn mode, fresh violations a term must appear in before it becomes active. */
     learnMinHits: z.number().int().min(1).max(100).optional(),
+    /** A moderator verdict teaches only when its score is at least this (0..1). */
+    learnMinModeratorScore: z.number().min(0).max(1).optional(),
+    /**
+     * Languages (ISO 639-1) an accepted learned word is translated into. The translations
+     * start pending and are learned like any other word. [] = no translations.
+     */
+    translateLanguages: z
+      .array(z.string().trim().toLowerCase().regex(TEXT_POLICY_LANGUAGE_PATTERN))
+      .max(MAX_TRANSLATE_LANGUAGES)
+      .optional(),
   })
   .strict();
 

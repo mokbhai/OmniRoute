@@ -9,7 +9,12 @@ import {
   listTextPolicyTerms,
   upsertTextPolicyTerm,
 } from "@/lib/db/textPolicyTerms";
-import { invalidateLearnedTermsCache } from "@/lib/textPolicy";
+import { getCachedSettings } from "@/lib/db/readCache";
+import {
+  invalidateLearnedTermsCache,
+  resolveTextPolicyConfig,
+  translateAcceptedTerms,
+} from "@/lib/textPolicy";
 
 import {
   invalidBody,
@@ -25,6 +30,8 @@ export const dynamic = "force-dynamic";
  *
  *   GET    /api/text-policies/<id>/terms[?status=pending|active|rejected]
  *   PUT    /api/text-policies/<id>/terms  { term, weight?, status? }  add / activate / reject / reweight
+ *          An activated term is translated once into the policy's `translateLanguages`
+ *          (in the background; the translations appear as pending terms).
  *   DELETE /api/text-policies/<id>/terms  { term }                    remove (learning may add it again)
  */
 
@@ -73,7 +80,21 @@ export async function PUT(request: Request, { params }: RouteContext) {
     const term = upsertTextPolicyTerm(policy.definition.id, parsed.data);
     if (!term) return createErrorResponse({ status: 400, message: "Invalid term" });
     invalidateLearnedTermsCache(policy.definition.id);
-    return NextResponse.json({ ok: true, term });
+    let translating = false;
+    if (term.status === "active" && !term.translatedAt && term.source !== "translation") {
+      const { config } = resolveTextPolicyConfig(
+        await getCachedSettings(),
+        policy.definition.id,
+        null
+      );
+      translating = Boolean(
+        config.moderatorModel && config.learnMode !== "off" && config.translateLanguages.length
+      );
+      if (translating) {
+        void translateAcceptedTerms(policy.definition, [term.term], config).catch(() => undefined);
+      }
+    }
+    return NextResponse.json({ ok: true, term, translating });
   } catch (error) {
     return routeFailure("PUT /api/text-policies/[policyId]/terms", error);
   }

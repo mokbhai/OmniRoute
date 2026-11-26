@@ -23,6 +23,28 @@ export interface KeywordTerm {
   weight: number;
 }
 
+/**
+ * How a moderator classifies a word it reports. The category, not the moderator, sets
+ * the weight a learned word gets; weight 0 means the word is never learned or translated
+ * (everyday words, identity words, words about minors, other harms).
+ */
+export interface TermCategory {
+  /** Short id the moderator returns, `[a-z_]`. */
+  id: string;
+  /** Shown to the moderator. */
+  description: string;
+  /** Weight of a learned term of this category (1..5), or 0 = never learned. */
+  weight: number;
+}
+
+/** A worked example for the moderator prompt (any language). */
+export interface TermExample {
+  term: string;
+  lang: string;
+  meaning: string;
+  category: string;
+}
+
 /** WHAT a policy detects. Built-in definitions live in code; custom ones come from settings. */
 export interface TextPolicyDefinition {
   /** Stable id: settings key, learned-terms partition, API path segment. `[a-z0-9-]`, max 48. */
@@ -43,6 +65,10 @@ export interface TextPolicyDefinition {
   seedTerms: readonly KeywordTerm[];
   /** Words a moderator may report that must never be learned for this policy. */
   stopWords?: readonly string[];
+  /** Categories the moderator classifies reported words into. Default: generic ones. */
+  termCategories?: readonly TermCategory[];
+  /** Worked examples shown to the moderator, ideally in several languages. */
+  termExamples?: readonly TermExample[];
   /** Lower runs first when several policies are enabled. */
   priority: number;
   /** True for definitions shipped in code; false for ones defined only in settings. */
@@ -60,20 +86,48 @@ export interface TextPolicyConfig {
   rerouteTarget: string | null;
   learnMode: TextPolicyLearnMode;
   learnMinHits: number;
+  /** A verdict teaches only when the moderator's score is at least this (0..1). */
+  learnMinModeratorScore: number;
+  /**
+   * ISO 639-1 codes. When a learned word is accepted, the moderator is asked once for its
+   * equivalents in these languages; they start pending and are learned like any other
+   * word. Empty = no translations.
+   */
+  translateLanguages: string[];
 }
 
 export type KeywordBand = "below" | "middle" | "above";
 
 export interface DiscoveredTerm {
   term: string;
+  /** Set from the category, not from the moderator. */
   weight: number;
+  /** ISO 639-1 code reported by the moderator. */
+  language?: string;
+  /** Short English meaning reported by the moderator. */
+  meaning?: string;
+  category?: string;
+}
+
+/** A reported word that is real but must not be learned (its category has weight 0). */
+export interface IgnoredTerm {
+  term: string;
+  category: string;
 }
 
 export interface TextPolicyLearningOutcome {
   mode: TextPolicyLearnMode;
   added: string[];
   activated: string[];
-  skipped?: "no_new_terms" | "learning_off" | "no_violation" | "cached_verdict" | "store_error";
+  /** Activated terms whose translations were requested. */
+  translating?: string[];
+  skipped?:
+    | "no_new_terms"
+    | "learning_off"
+    | "no_violation"
+    | "low_confidence"
+    | "cached_verdict"
+    | "store_error";
 }
 
 /** Result of the detection stages. Contains no request text. */
@@ -99,6 +153,8 @@ export interface TextPolicyDecision {
   moderatorError?: string;
   /** Chat moderator only: new terms it found in the text, with weights. */
   discoveredTerms?: DiscoveredTerm[];
+  /** Chat moderator only: words it reported in a never-learned category. */
+  ignoredTerms?: IgnoredTerm[];
   learning?: TextPolicyLearningOutcome;
 }
 

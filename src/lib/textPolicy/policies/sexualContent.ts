@@ -13,7 +13,7 @@
  * traditional) and some JA.
  */
 
-import type { KeywordTerm, TextPolicyDefinition } from "../types";
+import type { KeywordTerm, TermCategory, TermExample, TextPolicyDefinition } from "../types";
 
 const SEXUAL_CONTENT_TERMS: readonly KeywordTerm[] = [
   // ── weight 5: explicit acts / porn ───────────────────────────────────────
@@ -151,6 +151,84 @@ const SEXUAL_CONTENT_TERMS: readonly KeywordTerm[] = [
   ].map((term) => ({ term, weight: 1 })),
 ];
 
+/**
+ * Everyday words the moderator has reported in real traffic that must never be learned:
+ * they are sexual only because of the rest of the text. Any language.
+ */
+const SEXUAL_CONTENT_STOP_WORDS: readonly string[] = [
+  "woman",
+  "man",
+  "women",
+  "men",
+  "girl",
+  "boy",
+  "bed",
+  "body",
+  "love",
+  "kiss",
+  "wet",
+  "hard",
+  "release",
+  "dom",
+  "直播",
+  "真空",
+  "遛狗",
+  "身体",
+  "床",
+];
+
+/**
+ * Category → learned weight. Only words that are sexual on their own are learned. Identity
+ * words are never learned (they are not adult content), and words about minors are never
+ * learned or translated: that content needs a block policy, not a growing word list.
+ */
+const SEXUAL_CONTENT_CATEGORIES: readonly TermCategory[] = [
+  {
+    id: "explicit",
+    description: "an explicit sexual act, sexual body part, or pornography term",
+    weight: 5,
+  },
+  {
+    id: "slang",
+    description: "vulgar slang or a euphemism used for a sexual act or sexual body part",
+    weight: 5,
+  },
+  {
+    id: "nudity",
+    description: "nudity, undressing, or sexualized exposure of the body",
+    weight: 3,
+  },
+  { id: "fetish", description: "a fetish, BDSM, or kink term", weight: 3 },
+  {
+    id: "context",
+    description:
+      "an everyday word with ordinary meanings that is sexual only because of the rest of the TEXT (wet, hard, release, bed, livestream)",
+    weight: 0,
+  },
+  {
+    id: "identity",
+    description: "a sexual orientation or gender identity word (gay, lesbian, bisexual, trans)",
+    weight: 0,
+  },
+  { id: "minor", description: "any word about children, teenagers, or minors", weight: 0 },
+  {
+    id: "other",
+    description: "violence, hate, slurs, profanity that is not sexual, or anything else",
+    weight: 0,
+  },
+];
+
+const SEXUAL_CONTENT_EXAMPLES: readonly TermExample[] = [
+  { term: "blowjob", lang: "en", meaning: "oral sex", category: "explicit" },
+  { term: "做爱", lang: "zh", meaning: "to have sex", category: "explicit" },
+  { term: "follar", lang: "es", meaning: "to have sex (vulgar)", category: "slang" },
+  { term: "pelada", lang: "pt", meaning: "naked", category: "nudity" },
+  { term: "緊縛", lang: "ja", meaning: "rope bondage", category: "fetish" },
+  { term: "wet", lang: "en", meaning: "wet", category: "context" },
+  { term: "直播", lang: "zh", meaning: "livestream", category: "context" },
+  { term: "gay", lang: "en", meaning: "gay", category: "identity" },
+];
+
 export const SEXUAL_CONTENT_POLICY: TextPolicyDefinition = Object.freeze({
   id: "sexual-content",
   label: "Sexual / adult content",
@@ -159,7 +237,9 @@ export const SEXUAL_CONTENT_POLICY: TextPolicyDefinition = Object.freeze({
   classifierInstruction:
     "how sexually explicit or adult the TEXT is (0 = not at all, 1 = explicit pornography)",
   seedTerms: SEXUAL_CONTENT_TERMS,
-  stopWords: ["woman", "man", "women", "men", "girl", "boy", "bed", "body", "love", "kiss"],
+  stopWords: SEXUAL_CONTENT_STOP_WORDS,
+  termCategories: SEXUAL_CONTENT_CATEGORIES,
+  termExamples: SEXUAL_CONTENT_EXAMPLES,
   priority: 100,
   builtIn: true,
 });
